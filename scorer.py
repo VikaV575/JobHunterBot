@@ -19,6 +19,8 @@ STUDENT_SCORE_RULES = {
     "undergraduate": 74,
     "entry level": 68,
     "entry-level": 68,
+    "סטודנט": 78,
+    "מתמחה": 76,
 }
 
 
@@ -65,6 +67,14 @@ ROLE_SCORE_RULES = {
     "ml engineer": 18,
     "computer vision": 18,
     "algorithm": 18,
+    "תוכנה": 26,
+    "פיתוח תוכנה": 27,
+    "אוטומציה": 24,
+    "סייבר": 22,
+    "וריפיקציה": 30,
+    "ולידציה": 30,
+    "אלגוריתמים": 18,
+    "קושחה": 29,
 }
 
 
