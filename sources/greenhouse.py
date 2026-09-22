@@ -13,6 +13,8 @@ GREENHOUSE_COMPANIES = {
     "Similarweb": "similarweb",
     "JFrog": "jfrog",
     "Wiz": "wizinc",
+    "AppsFlyer": "appsflyer",
+    "Taboola": "taboola",
 }
 
 
