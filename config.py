@@ -1,4 +1,5 @@
-# Strong signals that a role is intended for students / early-career candidates.
+# Signals that the role is genuinely intended for a current student/intern.
+# Deliberately excludes junior / entry-level / new-grad roles.
 STUDENT_KEYWORDS = [
     "working student",
     "student position",
@@ -6,26 +7,18 @@ STUDENT_KEYWORDS = [
     "student software",
     "student developer",
     "student engineer",
+    "software student",
+    "engineering student",
     "student",
     "internship",
     "intern",
     "co-op",
     "coop",
-    "new college grad",
-    "new grad",
-    "graduate software",
-    "graduate engineer",
-    "entry level",
-    "entry-level",
-    "junior",
-    "part time",
-    "part-time",
     "undergraduate",
 ]
 
 
-# Strong technical role words. A title containing one of these is usually
-# relevant even if it does not explicitly say "student".
+# Strong technical role words.
 TECH_TITLE_KEYWORDS = [
     "software",
     "backend",
@@ -77,7 +70,7 @@ TECH_TITLE_KEYWORDS = [
 ]
 
 
-# Weaker title words: useful, but too broad to accept on their own.
+# Weaker technical title words. These require technical context too.
 WEAK_TECH_TITLE_KEYWORDS = [
     "engineer",
     "engineering",
@@ -88,11 +81,12 @@ WEAK_TECH_TITLE_KEYWORDS = [
 ]
 
 
-# Technical context words. These let us keep broad titles such as
-# "R&D Intern" or "Engineering Student" when the description is clearly CS/tech.
+# Technical context words used to verify broad student/intern titles.
 TECH_CONTEXT_KEYWORDS = [
     "computer science",
     "software engineering",
+    "computer engineering",
+    "electrical engineering",
     "python",
     "java",
     "javascript",
@@ -118,7 +112,6 @@ TECH_CONTEXT_KEYWORDS = [
     "operating system",
     "networking",
     "tcp",
-    "ip",
     "validation",
     "verification",
     "testing",
@@ -142,6 +135,31 @@ TECH_CONTEXT_KEYWORDS = [
     "data structures",
     "machine learning",
     "computer vision",
+]
+
+
+# Titles that are clearly outside the software / validation / engineering
+# student roles this bot is intended to find.
+NON_TECH_TITLE_KEYWORDS = [
+    "accounting",
+    "accountant",
+    "finance",
+    "financial",
+    "bookkeeper",
+    "marketing",
+    "sales",
+    "legal",
+    "law ",
+    "human resources",
+    " hr ",
+    "recruiter",
+    "recruiting",
+    "talent acquisition",
+    "customer success",
+    "business development",
+    "business analyst",
+    "product marketing",
+    "procurement",
 ]
 
 
