@@ -89,6 +89,12 @@ WORKDAY_COMPANIES = {
         "tenant": "cadence",
         "site": "Univ_Careers",
     },
+    "Samsung Electronics": {
+        "host": "sec.wd3.myworkdayjobs.com",
+        "tenant": "sec",
+        "site": "Samsung_Careers",
+        "search_text": "Israel",
+    },
 }
 
 
