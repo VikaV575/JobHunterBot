@@ -48,6 +48,13 @@ SOURCES = [
 SOURCE_TIMEOUT_SECONDS = 60
 SOURCE_CONCURRENCY = 6
 
+# Workday internally checks many companies, each with its own timeout.
+# Giving the whole Workday source only 60 seconds caused us to throw away
+# already-collected Workday jobs when a few slow companies were still running.
+SOURCE_TIMEOUTS = {
+    "Workday": 150,
+}
+
 
 async def _collect_source(
     semaphore,
@@ -55,10 +62,15 @@ async def _collect_source(
     source_function,
 ):
     async with semaphore:
+        timeout_seconds = SOURCE_TIMEOUTS.get(
+            source_name,
+            SOURCE_TIMEOUT_SECONDS,
+        )
+
         try:
             jobs = await asyncio.wait_for(
                 source_function(),
-                timeout=SOURCE_TIMEOUT_SECONDS,
+                timeout=timeout_seconds,
             )
 
             print(f"{source_name}: {len(jobs)}")
@@ -67,7 +79,7 @@ async def _collect_source(
         except asyncio.TimeoutError:
             print(
                 f"{source_name}: timed out after "
-                f"{SOURCE_TIMEOUT_SECONDS}s, skipping it"
+                f"{timeout_seconds}s, skipping it"
             )
             return []
 
