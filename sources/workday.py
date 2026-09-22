@@ -61,6 +61,21 @@ WORKDAY_COMPANIES = {
         "tenant": "workday",
         "site": "Workday",
     },
+    "Cisco": {
+        "host": "cisco.wd5.myworkdayjobs.com",
+        "tenant": "cisco",
+        "site": "Cisco_Careers",
+    },
+    "Altera": {
+        "host": "altera.wd1.myworkdayjobs.com",
+        "tenant": "altera",
+        "site": "Altera",
+    },
+    "Broadcom": {
+        "host": "broadcom.wd1.myworkdayjobs.com",
+        "tenant": "broadcom",
+        "site": "External_Career",
+    },
 }
 
 
