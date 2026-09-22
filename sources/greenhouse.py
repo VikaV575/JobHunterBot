@@ -15,6 +15,9 @@ GREENHOUSE_COMPANIES = {
     "Wiz": "wizinc",
     "AppsFlyer": "appsflyer",
     "Taboola": "taboola",
+    "Riskified": "riskified",
+    "Fireblocks": "fireblocks",
+    "Connecteam": "connecteam",
 }
 
 
