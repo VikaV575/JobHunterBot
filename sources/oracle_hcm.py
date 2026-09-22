@@ -140,9 +140,6 @@ async def _get_company_jobs(
 
         finder = (
             "findReqs;"
-            f"siteNumber={site},"
-            f"limit={PAGE_SIZE},"
-            f"offset={offset},"
             f"workLocationCountryCode={country_code}"
         )
 
@@ -150,6 +147,9 @@ async def _get_company_jobs(
             "onlyData": "true",
             "expand": "requisitionList",
             "finder": finder,
+            "limit": PAGE_SIZE,
+            "offset": offset,
+            "q": f"SiteNumber='{site}'",
         }
 
         try:
@@ -234,10 +234,17 @@ async def _get_company_jobs(
         if new_rows == 0 and page > 0:
             break
 
-    print(
-        f"Oracle HCM {company_name}: "
-        f"{len(jobs)} Israel jobs"
-    )
+    if jobs:
+        print(
+            f"Oracle HCM {company_name}: "
+            f"{len(jobs)} Israel jobs"
+        )
+    else:
+        print(
+            f"Oracle HCM {company_name}: "
+            "source responded successfully; "
+            "0 currently open Israel jobs"
+        )
 
     return jobs
 
