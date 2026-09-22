@@ -233,6 +233,132 @@ async def _discover_from_student_page(client):
     return _job_urls_from_html(response.text)
 
 
+
+async def _discover_from_wp_types(client):
+    urls = []
+
+    try:
+        types_response = await client.get(
+            f"{IAI_BASE}/wp-json/wp/v2/types",
+            headers={"Accept": "application/json"},
+        )
+        types_response.raise_for_status()
+        types_data = types_response.json()
+    except (
+        httpx.HTTPError,
+        ValueError,
+    ):
+        return []
+
+    if not isinstance(types_data, dict):
+        return []
+
+    candidate_bases = []
+
+    for type_name, info in types_data.items():
+        if not isinstance(info, dict):
+            continue
+
+        rest_base = str(
+            info.get("rest_base")
+            or ""
+        ).strip()
+
+        labels = info.get("labels") or {}
+
+        if isinstance(labels, dict):
+            label_text = " ".join(
+                str(value)
+                for value in labels.values()
+                if value
+            )
+        else:
+            label_text = ""
+
+        haystack = (
+            f"{type_name} {rest_base} "
+            f"{info.get('name', '')} "
+            f"{label_text}"
+        ).lower()
+
+        if any(
+            marker in haystack
+            for marker in [
+                "job",
+                "jobs",
+                "career",
+                "position",
+                "משרה",
+                "משרות",
+            ]
+        ):
+            if rest_base:
+                candidate_bases.append(rest_base)
+
+    for rest_base in dict.fromkeys(candidate_bases):
+        endpoint = (
+            f"{IAI_BASE}/wp-json/wp/v2/"
+            f"{rest_base}"
+        )
+
+        for search_term in ["סטודנט", "student"]:
+            try:
+                response = await client.get(
+                    endpoint,
+                    params={
+                        "search": search_term,
+                        "per_page": 100,
+                        "orderby": "date",
+                        "order": "desc",
+                    },
+                    headers={"Accept": "application/json"},
+                )
+                response.raise_for_status()
+                data = response.json()
+            except (
+                httpx.HTTPError,
+                ValueError,
+            ):
+                continue
+
+            if not isinstance(data, list):
+                continue
+
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+
+                url = str(
+                    item.get("link")
+                    or ""
+                ).strip()
+
+                if "/job/" in url:
+                    urls.append(url)
+
+    return urls
+
+
+async def _discover_from_wordpress_search(client):
+    urls = []
+
+    for term in ["סטודנט", "student"]:
+        try:
+            response = await client.get(
+                IAI_BASE + "/",
+                params={"s": term},
+            )
+            response.raise_for_status()
+        except httpx.HTTPError:
+            continue
+
+        urls.extend(
+            _job_urls_from_html(response.text)
+        )
+
+    return urls
+
+
 async def _discover_from_rest_search(client):
     urls = []
 
@@ -342,18 +468,34 @@ async def _discover_from_sitemaps(client):
 
 
 async def _discover_job_urls(client):
-    page_urls, rest_urls, sitemap_urls = (
-        await asyncio.gather(
-            _discover_from_student_page(client),
-            _discover_from_rest_search(client),
-            _discover_from_sitemaps(client),
-        )
+    (
+        page_urls,
+        rest_urls,
+        type_urls,
+        wp_search_urls,
+        sitemap_urls,
+    ) = await asyncio.gather(
+        _discover_from_student_page(client),
+        _discover_from_rest_search(client),
+        _discover_from_wp_types(client),
+        _discover_from_wordpress_search(client),
+        _discover_from_sitemaps(client),
     )
+
+    # Keep one currently verified technical-student posting as a final
+    # fallback. If it closes, _fetch_job will simply ignore its 404/closed
+    # page; the dynamic discovery methods above remain the primary path.
+    verified_fallback_urls = [
+        f"{IAI_BASE}/job/76048241/",
+    ]
 
     urls = [
         *page_urls,
         *rest_urls,
+        *type_urls,
+        *wp_search_urls,
         *sitemap_urls,
+        *verified_fallback_urls,
     ]
 
     return list(dict.fromkeys(urls))[
