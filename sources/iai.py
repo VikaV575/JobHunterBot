@@ -127,7 +127,7 @@ def _is_recent(lastmod):
 def _extract_location(text):
     for marker in LOCATION_MARKERS:
         if marker in text:
-            return marker
+            return f"{marker}, Israel"
 
     return "Israel"
 
