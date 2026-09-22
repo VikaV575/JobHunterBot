@@ -2,28 +2,21 @@ import re
 
 
 STUDENT_SCORE_RULES = {
-    # Explicit student/intern signals should dominate the ranking.
-    "working student": 78,
-    "student software": 78,
-    "student developer": 78,
-    "student engineer": 78,
-    "student position": 76,
-    "student role": 76,
-    "internship": 76,
-    "intern": 75,
-    "student": 74,
-    "co-op": 72,
-    "coop": 72,
-
-    # Early-career signals are also highly relevant for this bot.
-    "new college grad": 70,
-    "new grad": 68,
-    "graduate software": 66,
-    "graduate engineer": 64,
-    "entry level": 62,
-    "entry-level": 62,
-    "undergraduate": 62,
-    "junior": 58,
+    # Only true student/intern signals belong here.
+    "working student": 82,
+    "student software": 82,
+    "student developer": 82,
+    "student engineer": 82,
+    "software student": 82,
+    "engineering student": 82,
+    "student position": 80,
+    "student role": 80,
+    "internship": 80,
+    "intern": 79,
+    "student": 78,
+    "co-op": 76,
+    "coop": 76,
+    "undergraduate": 74,
 }
 
 
