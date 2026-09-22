@@ -1,3 +1,5 @@
+import re
+from datetime import date, datetime, timedelta
 from urllib.parse import urljoin
 
 import httpx
@@ -5,6 +7,10 @@ from bs4 import BeautifulSoup
 
 
 APPLE_SEARCH_URL = "https://jobs.apple.com/en-il/search"
+
+# Apple keeps some very old roles visible in search results. We only keep
+# recently posted roles so stale 2024/2025 listings do not dominate the feed.
+MAX_JOB_AGE_DAYS = 90
 MAX_PAGES = 8
 
 ISRAEL_LOCATION_HINTS = [
@@ -16,6 +22,13 @@ ISRAEL_LOCATION_HINTS = [
     "Ramat Gan",
     "Israel",
 ]
+
+DATE_PATTERN = re.compile(
+    r"\b(\d{1,2})\s+"
+    r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)"
+    r"\s+(\d{4})\b",
+    re.IGNORECASE,
+)
 
 
 def _nearest_context(link):
@@ -71,6 +84,41 @@ def _extract_location(context):
     return "Israel"
 
 
+def _extract_posted_date(context):
+    match = DATE_PATTERN.search(context)
+
+    if not match:
+        return None
+
+    day, month, year = match.groups()
+
+    # Apple sometimes writes September as "Sept" rather than "Sep".
+    if month.lower() == "sept":
+        month = "Sep"
+
+    try:
+        return datetime.strptime(
+            f"{day} {month} {year}",
+            "%d %b %Y",
+        ).date()
+
+    except ValueError:
+        return None
+
+
+def _is_recent(posted_date):
+    if posted_date is None:
+        # If Apple changes the markup and we cannot find the date,
+        # keep the role rather than accidentally losing a new posting.
+        return True
+
+    cutoff = date.today() - timedelta(
+        days=MAX_JOB_AGE_DAYS
+    )
+
+    return posted_date >= cutoff
+
+
 def _parse_page(html):
     soup = BeautifulSoup(html, "html.parser")
     jobs = {}
@@ -88,6 +136,11 @@ def _parse_page(html):
         if not title:
             continue
 
+        posted_date = _extract_posted_date(context)
+
+        if not _is_recent(posted_date):
+            continue
+
         jobs[url] = {
             "title": title,
             "company_name": "Apple",
@@ -95,6 +148,11 @@ def _parse_page(html):
             "url": url,
             "description": context,
             "source": "Apple Careers",
+            "posted_date": (
+                posted_date.isoformat()
+                if posted_date
+                else ""
+            ),
         }
 
     return list(jobs.values())
@@ -142,10 +200,17 @@ async def get_apple_jobs():
             ]
 
             if not new_jobs:
+                # Apple sorts this search by newest. Once a page contains
+                # no recent roles, later pages are normally older as well.
                 break
 
             for job in new_jobs:
                 seen_urls.add(job["url"])
                 jobs.append(job)
+
+    print(
+        f"Apple Careers: keeping {len(jobs)} roles "
+        f"posted in the last {MAX_JOB_AGE_DAYS} days"
+    )
 
     return jobs
