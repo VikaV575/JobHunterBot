@@ -15,7 +15,12 @@ WORKDAY_COMPANIES = {
         "host": "nvidia.wd5.myworkdayjobs.com",
         "tenant": "nvidia",
         "site": "NVIDIAExternalCareerSite",
-        "search_text": "Israel",
+        "search_texts": [
+            "student",
+            "intern",
+            "entry level",
+            "university",
+        ],
     },
     "HP": {
         "host": "hp.wd5.myworkdayjobs.com",
@@ -195,6 +200,7 @@ async def _get_company_jobs(
     config,
 ):
     jobs = []
+    seen_external_paths = set()
 
     host = config["host"]
     tenant = config["tenant"]
@@ -205,130 +211,151 @@ async def _get_company_jobs(
         f"{tenant}/{site}/jobs"
     )
 
-    offset = 0
+    search_texts = config.get("search_texts")
+
+    if not search_texts:
+        search_texts = [
+            config.get("search_text", "")
+        ]
+
     limit = 20
 
     print(f"Fetching Workday jobs from {company_name}...")
 
-    while True:
-        payload = {
-            "appliedFacets": {},
-            "limit": limit,
-            "offset": offset,
-            "searchText": config.get("search_text", ""),
-        }
+    for search_text in search_texts:
+        offset = 0
 
-        try:
-            response = await _request_with_retry(
-                client,
-                "POST",
-                api_url,
-                json=payload,
-                headers={
-                    "Origin": f"https://{host}",
-                    "Referer": f"https://{host}/{site}",
-                },
-            )
-            data = response.json()
+        while True:
+            payload = {
+                "appliedFacets": {},
+                "limit": limit,
+                "offset": offset,
+                "searchText": search_text,
+            }
 
-        except httpx.HTTPError as error:
-            print(
-                f"Failed getting Workday jobs "
-                f"for {company_name}: {error}"
-            )
-            break
+            try:
+                response = await _request_with_retry(
+                    client,
+                    "POST",
+                    api_url,
+                    json=payload,
+                    headers={
+                        "Origin": f"https://{host}",
+                        "Referer": f"https://{host}/{site}",
+                    },
+                )
+                data = response.json()
 
-        postings = data.get("jobPostings", [])
+            except httpx.HTTPError as error:
+                print(
+                    f"Failed getting Workday jobs "
+                    f"for {company_name}"
+                    f"{f' ({search_text})' if search_text else ''}: "
+                    f"{error}"
+                )
+                break
 
-        if not postings:
-            break
+            postings = data.get("jobPostings", [])
 
-        for job in postings:
-            title = job.get("title", "")
-            location = job.get("locationsText", "")
-            external_path = job.get("externalPath", "")
+            if not postings:
+                break
 
-            if not external_path:
-                continue
+            for job in postings:
+                title = job.get("title", "")
+                location = job.get("locationsText", "")
+                external_path = job.get("externalPath", "")
 
-            description = ""
+                if (
+                    not external_path
+                    or external_path in seen_external_paths
+                ):
+                    continue
 
-            needs_details = (
-                "locations" in location.lower()
-                or not location
-            )
+                description = ""
 
-            if needs_details:
-                try:
-                    details = await get_workday_job_details(
-                        client,
-                        host,
-                        tenant,
-                        site,
-                        external_path,
-                    )
+                needs_details = (
+                    "locations" in location.lower()
+                    or not location
+                )
 
-                    primary_location = details.get(
-                        "location",
-                        "",
-                    )
-
-                    additional_locations = details.get(
-                        "additionalLocations",
-                        [],
-                    )
-
-                    all_locations = []
-
-                    if primary_location:
-                        all_locations.append(primary_location)
-
-                    if isinstance(additional_locations, list):
-                        all_locations.extend(
-                            additional_locations
+                if needs_details:
+                    try:
+                        details = await get_workday_job_details(
+                            client,
+                            host,
+                            tenant,
+                            site,
+                            external_path,
                         )
 
-                    location = ", ".join(
-                        item
-                        for item in all_locations
-                        if item
-                    )
+                        primary_location = details.get(
+                            "location",
+                            "",
+                        )
 
-                    description = details.get(
-                        "jobDescription",
-                        "",
-                    )
+                        additional_locations = details.get(
+                            "additionalLocations",
+                            [],
+                        )
 
-                except httpx.HTTPError as error:
-                    print(
-                        f"Failed getting details "
-                        f"for {company_name} - "
-                        f"{title}: {error}"
-                    )
+                        all_locations = []
 
-            if not _is_israel_location(location):
-                continue
+                        if primary_location:
+                            all_locations.append(
+                                primary_location
+                            )
 
-            job_url = (
-                f"https://{host}/en-US/"
-                f"{site}{external_path}"
-            )
+                        if isinstance(
+                            additional_locations,
+                            list,
+                        ):
+                            all_locations.extend(
+                                additional_locations
+                            )
 
-            jobs.append({
-                "title": title,
-                "company_name": company_name,
-                "location": location,
-                "url": job_url,
-                "description": description,
-                "source": "Workday",
-            })
+                        location = ", ".join(
+                            item
+                            for item in all_locations
+                            if item
+                        )
 
-        offset += limit
+                        description = details.get(
+                            "jobDescription",
+                            "",
+                        )
 
-        total = data.get("total", 0)
+                    except httpx.HTTPError as error:
+                        print(
+                            f"Failed getting details "
+                            f"for {company_name} - "
+                            f"{title}: {error}"
+                        )
 
-        if offset >= total:
-            break
+                if not _is_israel_location(location):
+                    continue
+
+                seen_external_paths.add(external_path)
+
+                job_url = (
+                    f"https://{host}/en-US/"
+                    f"{site}{external_path}"
+                )
+
+                jobs.append({
+                    "title": title,
+                    "company_name": company_name,
+                    "location": location,
+                    "url": job_url,
+                    "description": description,
+                    "source": "Workday",
+                })
+
+            offset += limit
+
+            total = data.get("total", 0)
+
+            if offset >= total:
+                break
 
     print(
         f"Workday {company_name}: "
