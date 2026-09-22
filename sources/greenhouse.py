@@ -9,6 +9,10 @@ GREENHOUSE_COMPANIES = {
     "DoiT": "doitintl",
     "Aidoc": "aidocmedical",
     "accessiBe": "accessibe",
+    "Cato Networks": "catonetworks",
+    "Similarweb": "similarweb",
+    "JFrog": "jfrog",
+    "Wiz": "wizinc",
 }
 
 
