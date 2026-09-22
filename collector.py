@@ -3,20 +3,15 @@ import asyncio
 from sources.amazon import get_amazon_jobs
 from sources.apple import get_apple_jobs
 from sources.ashby import get_ashby_jobs
-from sources.bamboohr import get_bamboohr_jobs
-from sources.breezy import get_breezy_jobs
 from sources.comeet import get_comeet_jobs
 from sources.direct_company_sites import get_direct_company_jobs
 from sources.devjobs import get_devjobs_jobs
 from sources.greenhouse import get_greenhouse_jobs
 from sources.google_careers import get_google_careers_jobs
 from sources.jobnet import get_jobnet_jobs
-from sources.iai import get_iai_jobs
 from sources.lever import get_lever_jobs
 from sources.microsoft import get_microsoft_jobs
-from sources.oracle_hcm import get_oracle_hcm_jobs
 from sources.personio import get_personio_jobs
-from sources.pinpoint import get_pinpoint_jobs
 from sources.recruitee import get_recruitee_jobs
 from sources.rippling import get_rippling_jobs
 from sources.sap import get_sap_jobs
@@ -36,8 +31,6 @@ SOURCES = [
     ("SAP Careers", get_sap_jobs),
     ("DevJobs", get_devjobs_jobs),
     ("Jobnet", get_jobnet_jobs),
-    ("IAI Careers", get_iai_jobs),
-    ("Oracle HCM", get_oracle_hcm_jobs),
     ("Direct company sites", get_direct_company_jobs),
     ("Greenhouse", get_greenhouse_jobs),
     ("Ashby", get_ashby_jobs),
@@ -50,9 +43,6 @@ SOURCES = [
     ("Teamtailor", get_teamtailor_jobs),
     ("Rippling", get_rippling_jobs),
     ("Personio", get_personio_jobs),
-    ("BambooHR", get_bamboohr_jobs),
-    ("Breezy HR", get_breezy_jobs),
-    ("Pinpoint", get_pinpoint_jobs),
 ]
 
 SOURCE_TIMEOUT_SECONDS = 60
