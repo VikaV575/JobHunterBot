@@ -49,11 +49,6 @@ COMEET_BRANDED_SITES = {
         "job_pattern": r"/careers/co/.+?/[^/]+/all/?$",
         "title_slug_index": -2,
     },
-    "Qedma": {
-        "url": "https://www.qedma.com/careers/",
-        "job_pattern": r"/careers/co/.+?/[^/]+/all/?$",
-        "title_slug_index": -2,
-    },
     "Anecdotes": {
         "url": "https://www.anecdotes.ai/careers",
         "job_pattern": r"/job/[^/]+/?$",
@@ -62,6 +57,7 @@ COMEET_BRANDED_SITES = {
 }
 
 COMEET_CONCURRENCY = 6
+COMEET_RETRIES = 3
 
 GENERIC_LINK_TEXT = {
     "",
@@ -340,16 +336,42 @@ async def _fetch_company(
     config,
 ):
     async with semaphore:
-        try:
-            response = await client.get(config["url"])
-            response.raise_for_status()
+        response = None
 
-        except httpx.HTTPError as error:
-            print(
-                f"Failed getting Comeet-backed jobs "
-                f"for {company_name}: {error}"
-            )
-            return []
+        for attempt in range(1, COMEET_RETRIES + 1):
+            try:
+                response = await client.get(config["url"])
+                response.raise_for_status()
+                break
+
+            except (
+                httpx.ConnectError,
+                httpx.ConnectTimeout,
+                httpx.ReadTimeout,
+                httpx.RemoteProtocolError,
+            ) as error:
+                if attempt == COMEET_RETRIES:
+                    print(
+                        f"Failed getting Comeet-backed jobs "
+                        f"for {company_name}: "
+                        f"{type(error).__name__}: {error}"
+                    )
+                    return []
+
+                print(
+                    f"Temporary Comeet network error for "
+                    f"{company_name} "
+                    f"(attempt {attempt}/{COMEET_RETRIES}): "
+                    f"{type(error).__name__}"
+                )
+                await asyncio.sleep(attempt)
+
+            except httpx.HTTPError as error:
+                print(
+                    f"Failed getting Comeet-backed jobs "
+                    f"for {company_name}: {error}"
+                )
+                return []
 
         jobs = _parse_site(
             response.text,
