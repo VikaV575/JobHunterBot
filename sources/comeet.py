@@ -23,6 +23,7 @@ COMEET_BOARDS = {
     "Imagene AI": (
         "https://www.comeet.com/jobs/imagene-ai/D7.000"
     ),
+    "SolarEdge": "https://www.comeet.com/jobs/solaredge/71.00a",
 }
 
 
