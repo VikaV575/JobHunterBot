@@ -8,3 +8,4 @@ idna==3.19
 python-dotenv==1.2.3
 python-telegram-bot==22.8
 typing_extensions==4.16.0
+selenium>=4.35,<5
