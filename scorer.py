@@ -92,94 +92,54 @@ SKILL_SCORE_RULES = {
 }
 
 
-def _contains_keyword(text, keyword):
-    pattern = (
-        r"(?<![a-z0-9])"
-        + re.escape(keyword.lower())
-        + r"(?![a-z0-9])"
-    )
-
-    return re.search(pattern, text.lower()) is not None
+MAX_DESCRIPTION_CHARS = 20000
+YEARS_PATTERN = re.compile(
+    r"\b(\d{1,2})\+?\s*(?:years|yrs)\b",
+    re.IGNORECASE,
+)
 
 
-def _matching_rules(text, rules):
+def _compile_rules(rules):
+    compiled = []
+
+    for keyword, points in rules.items():
+        pattern = re.compile(
+            r"(?<![a-z0-9])"
+            + re.escape(keyword.lower())
+            + r"(?![a-z0-9])",
+            re.IGNORECASE,
+        )
+
+        compiled.append(
+            (keyword, points, pattern)
+        )
+
+    return compiled
+
+
+COMPILED_STUDENT_RULES = _compile_rules(
+    STUDENT_SCORE_RULES
+)
+COMPILED_ROLE_RULES = _compile_rules(
+    ROLE_SCORE_RULES
+)
+COMPILED_SKILL_RULES = _compile_rules(
+    SKILL_SCORE_RULES
+)
+
+
+def _matching_rules(text, compiled_rules):
     return [
         (keyword, points)
-        for keyword, points in rules.items()
-        if _contains_keyword(text, keyword)
+        for keyword, points, pattern in compiled_rules
+        if pattern.search(text)
     ]
-
-
-def _best_student_score(title, description):
-    title_matches = _matching_rules(
-        title,
-        STUDENT_SCORE_RULES,
-    )
-
-    if title_matches:
-        return max(points for _, points in title_matches)
-
-    description_matches = _matching_rules(
-        description,
-        STUDENT_SCORE_RULES,
-    )
-
-    if description_matches:
-        # A student/intern signal in the description matters, but it is
-        # weaker than having it explicitly in the job title.
-        return min(
-            28,
-            round(
-                max(points for _, points in description_matches)
-                * 0.5
-            ),
-        )
-
-    return 0
-
-
-def _role_score(title):
-    matches = sorted(
-        _matching_rules(title, ROLE_SCORE_RULES),
-        key=lambda item: item[1],
-        reverse=True,
-    )
-
-    if not matches:
-        return 0
-
-    score = matches[0][1]
-
-    # A second distinct role signal is useful, but should not double-count.
-    if len(matches) > 1:
-        score += round(matches[1][1] * 0.25)
-
-    return min(score, 32)
-
-
-def _skill_score(title, description):
-    text = f"{title} {description}"
-
-    matched_points = [
-        points
-        for _, points in _matching_rules(
-            text,
-            SKILL_SCORE_RULES,
-        )
-    ]
-
-    return min(sum(matched_points), 12)
 
 
 def _experience_penalty(description):
-    description = description.lower()
-
     years = [
         int(match)
-        for match in re.findall(
-            r"\b(\d{1,2})\+?\s*(?:years|yrs)\b",
-            description,
-        )
+        for match in YEARS_PATTERN.findall(description)
     ]
 
     if not years:
@@ -196,37 +156,102 @@ def _experience_penalty(description):
     return 0
 
 
-def _match_labels(title, description):
-    labels = []
+def _score_and_labels(job):
+    title = str(
+        job.get("title", "")
+    ).lower()
 
-    student_matches = sorted(
-        _matching_rules(title, STUDENT_SCORE_RULES),
-        key=lambda item: item[1],
-        reverse=True,
+    description = str(
+        job.get("description", "")
+    ).lower()[:MAX_DESCRIPTION_CHARS]
+
+    title_student_matches = _matching_rules(
+        title,
+        COMPILED_STUDENT_RULES,
     )
 
-    if student_matches:
-        labels.append(student_matches[0][0])
-    else:
-        description_student_matches = sorted(
-            _matching_rules(
-                description,
-                STUDENT_SCORE_RULES,
-            ),
+    if title_student_matches:
+        student_score = max(
+            points
+            for _, points in title_student_matches
+        )
+        strongest_student = max(
+            title_student_matches,
             key=lambda item: item[1],
-            reverse=True,
+        )[0]
+    else:
+        description_student_matches = _matching_rules(
+            description,
+            COMPILED_STUDENT_RULES,
         )
 
         if description_student_matches:
-            labels.append(
-                f"{description_student_matches[0][0]} in description"
+            strongest = max(
+                description_student_matches,
+                key=lambda item: item[1],
             )
 
+            student_score = min(
+                28,
+                round(strongest[1] * 0.5),
+            )
+            strongest_student = (
+                f"{strongest[0]} in description"
+            )
+        else:
+            student_score = 0
+            strongest_student = None
+
     role_matches = sorted(
-        _matching_rules(title, ROLE_SCORE_RULES),
+        _matching_rules(
+            title,
+            COMPILED_ROLE_RULES,
+        ),
         key=lambda item: item[1],
         reverse=True,
     )
+
+    role_score = 0
+
+    if role_matches:
+        role_score = role_matches[0][1]
+
+        if len(role_matches) > 1:
+            role_score += round(
+                role_matches[1][1] * 0.25
+            )
+
+        role_score = min(role_score, 32)
+
+    skill_matches = _matching_rules(
+        f"{title} {description}",
+        COMPILED_SKILL_RULES,
+    )
+
+    skill_score = min(
+        sum(points for _, points in skill_matches),
+        12,
+    )
+
+    penalty = _experience_penalty(description)
+
+    score = max(
+        0,
+        min(
+            round(
+                student_score
+                + role_score
+                + skill_score
+                - penalty
+            ),
+            100,
+        ),
+    )
+
+    labels = []
+
+    if strongest_student:
+        labels.append(strongest_student)
 
     for keyword, _ in role_matches:
         if keyword not in labels:
@@ -235,59 +260,36 @@ def _match_labels(title, description):
         if len(labels) >= 4:
             break
 
-    return labels[:4]
+    return score, labels[:4]
 
 
 def score_job(job):
-    title = str(job.get("title", "")).lower()
-    description = str(job.get("description", "")).lower()
-
-    student_score = _best_student_score(
-        title,
-        description,
-    )
-
-    role_score = _role_score(title)
-    skill_score = _skill_score(
-        title,
-        description,
-    )
-
-    penalty = _experience_penalty(description)
-
-    score = (
-        student_score
-        + role_score
-        + skill_score
-        - penalty
-    )
-
-    # Relevant non-student roles should still get a useful score, while
-    # explicit student/intern roles naturally rise to the top.
-    score = max(0, min(round(score), 100))
-
+    score, _ = _score_and_labels(job)
     return score
 
 
 def score_jobs(jobs):
+    print(f"Scoring {len(jobs)} jobs...")
+
     for job in jobs:
-        title = str(job.get("title", "")).lower()
-        description = str(
-            job.get("description", "")
-        ).lower()
+        score, labels = _score_and_labels(job)
+        job["score"] = score
+        job["matches"] = labels
 
-        job["score"] = score_job(job)
-        job["matches"] = _match_labels(
-            title,
-            description,
-        )
-
-    return sorted(
+    ranked_jobs = sorted(
         jobs,
         key=lambda job: (
             job["score"],
-            "student" in job.get("title", "").lower()
-            or "intern" in job.get("title", "").lower(),
+            "student" in str(
+                job.get("title", "")
+            ).lower()
+            or "intern" in str(
+                job.get("title", "")
+            ).lower(),
         ),
         reverse=True,
     )
+
+    print("Scoring complete")
+
+    return ranked_jobs
