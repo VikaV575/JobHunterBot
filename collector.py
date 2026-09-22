@@ -59,6 +59,10 @@ SOURCE_CONCURRENCY = 6
 # already-collected Workday jobs when a few slow companies were still running.
 SOURCE_TIMEOUTS = {
     "Workday": 150,
+    # IAI first renders the JavaScript student board in headless Chrome
+    # and then loads every discovered job page. 60 seconds was enough to
+    # discover the links but not enough to finish loading the details.
+    "IAI Careers": 180,
 }
 
 
