@@ -1,118 +1,245 @@
-import re
-from urllib.parse import urljoin
+import html
 
 import httpx
-from bs4 import BeautifulSoup
 
 
 ORACLE_HCM_SITES = {
     "Texas Instruments": {
-        "url": (
-            "https://edbz.fa.us2.oraclecloud.com/"
-            "hcmUI/CandidateExperience/en/sites/CX/jobs"
-        ),
+        "host": "edbz.fa.us2.oraclecloud.com",
+        "site": "CX",
         "source": "Texas Instruments Careers",
+        "country_code": "IL",
     },
 }
 
-JOB_HREF_PATTERN = re.compile(
-    r"/hcmUI/CandidateExperience/en/sites/CX/job/\d+",
-    re.IGNORECASE,
-)
-
-ISRAEL_MARKERS = [
-    "israel",
-    "ra'anana",
-    "raanana",
-    "tel aviv",
-    "herzliya",
-    "haifa",
-]
+PAGE_SIZE = 100
+MAX_PAGES = 5
 
 
-def _nearest_context(link):
-    fallback = link.get_text(" ", strip=True)
+def _clean_text(value):
+    if value is None:
+        return ""
 
-    for parent in link.parents:
-        if getattr(parent, "name", None) not in {
-            "li",
-            "article",
-            "section",
-            "div",
-        }:
+    text = html.unescape(str(value))
+    return (
+        text.replace("<br>", " ")
+        .replace("<br/>", " ")
+        .replace("<br />", " ")
+    )
+
+
+def _request_items(data):
+    if not isinstance(data, dict):
+        return []
+
+    items = data.get("items", [])
+
+    if not isinstance(items, list):
+        return []
+
+    return items
+
+
+def _requisition_rows(data):
+    rows = []
+
+    for item in _request_items(data):
+        if not isinstance(item, dict):
             continue
 
-        text = parent.get_text(" ", strip=True)
+        requisitions = item.get(
+            "requisitionList",
+            [],
+        )
 
-        if not text:
-            continue
+        if isinstance(requisitions, list):
+            rows.extend(
+                row
+                for row in requisitions
+                if isinstance(row, dict)
+            )
 
-        if len(text) <= 2500:
-            fallback = text
-
-        if any(
-            marker in text.lower()
-            for marker in ISRAEL_MARKERS
-        ):
-            return text
-
-    return fallback
+    return rows
 
 
-def _extract_location(text):
-    lowered = text.lower()
+def _location_text(row):
+    primary = str(
+        row.get("PrimaryLocation")
+        or ""
+    ).strip()
 
-    if "ra'anana" in lowered or "raanana" in lowered:
-        return "Ra'anana, Israel"
+    country = str(
+        row.get("PrimaryLocationCountry")
+        or ""
+    ).strip()
 
-    if "tel aviv" in lowered:
-        return "Tel Aviv, Israel"
+    if primary:
+        return primary
 
-    if "herzliya" in lowered:
-        return "Herzliya, Israel"
-
-    if "haifa" in lowered:
-        return "Haifa, Israel"
-
-    if "israel" in lowered:
+    if country.upper() == "IL":
         return "Israel"
 
     return ""
 
 
-def _parse_jobs(html, base_url, company_name, source_name):
-    soup = BeautifulSoup(html, "html.parser")
-    jobs = {}
+def _is_israel_row(row):
+    country = str(
+        row.get("PrimaryLocationCountry")
+        or ""
+    ).upper()
 
-    for link in soup.find_all("a", href=True):
-        href = link.get("href", "")
+    location = _location_text(row).lower()
 
-        if not JOB_HREF_PATTERN.search(href):
-            continue
+    return (
+        country in {"IL", "ISR"}
+        or "israel" in location
+        or "ra'anana" in location
+        or "raanana" in location
+    )
 
-        title = link.get_text(" ", strip=True)
 
-        if not title or len(title) > 220:
-            continue
+def _description(row):
+    parts = [
+        row.get("ShortDescriptionStr"),
+        row.get("ExternalResponsibilitiesStr"),
+        row.get("ExternalQualificationsStr"),
+        row.get("JobFamily"),
+        row.get("JobFunction"),
+        row.get("StudyLevel"),
+    ]
 
-        context = _nearest_context(link)
-        location = _extract_location(context)
+    return "\n".join(
+        _clean_text(part)
+        for part in parts
+        if part
+    )
 
-        if not location:
-            continue
 
-        url = urljoin(base_url, href).split("?")[0]
+async def _get_company_jobs(
+    client,
+    company_name,
+    config,
+):
+    host = config["host"]
+    site = config["site"]
+    country_code = config.get(
+        "country_code",
+        "IL",
+    )
 
-        jobs[url] = {
-            "title": title,
-            "company_name": company_name,
-            "location": location,
-            "url": url,
-            "description": context,
-            "source": source_name,
+    endpoint = (
+        f"https://{host}/hcmRestApi/resources/latest/"
+        "recruitingCEJobRequisitions"
+    )
+
+    jobs = []
+    seen_ids = set()
+
+    for page in range(MAX_PAGES):
+        offset = page * PAGE_SIZE
+
+        finder = (
+            "findReqs;"
+            f"siteNumber={site},"
+            f"limit={PAGE_SIZE},"
+            f"offset={offset},"
+            f"workLocationCountryCode={country_code}"
+        )
+
+        params = {
+            "onlyData": "true",
+            "expand": "requisitionList",
+            "finder": finder,
         }
 
-    return list(jobs.values())
+        try:
+            response = await client.get(
+                endpoint,
+                params=params,
+                headers={
+                    "Accept": (
+                        "application/vnd.oracle.adf."
+                        "resourcecollection+json"
+                    ),
+                    "REST-Framework-Version": "4",
+                    "Ora-Irc-Language": "en",
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        except (
+            httpx.HTTPError,
+            ValueError,
+        ) as error:
+            print(
+                f"Failed getting Oracle HCM jobs "
+                f"for {company_name}: "
+                f"{type(error).__name__}: {error}"
+            )
+            break
+
+        rows = _requisition_rows(data)
+
+        if not rows:
+            break
+
+        new_rows = 0
+
+        for row in rows:
+            if not _is_israel_row(row):
+                continue
+
+            job_id = str(
+                row.get("Id")
+                or row.get("RequisitionId")
+                or ""
+            ).strip()
+
+            title = str(
+                row.get("Title")
+                or ""
+            ).strip()
+
+            if (
+                not job_id
+                or not title
+                or job_id in seen_ids
+            ):
+                continue
+
+            seen_ids.add(job_id)
+            new_rows += 1
+
+            jobs.append({
+                "title": title,
+                "company_name": company_name,
+                "location": _location_text(row),
+                "url": (
+                    f"https://{host}/hcmUI/"
+                    "CandidateExperience/en/sites/"
+                    f"{site}/job/{job_id}"
+                ),
+                "description": _description(row),
+                "source": config["source"],
+                "posted_date": str(
+                    row.get("PostedDate")
+                    or ""
+                ),
+            })
+
+        if len(rows) < PAGE_SIZE:
+            break
+
+        if new_rows == 0 and page > 0:
+            break
+
+    print(
+        f"Oracle HCM {company_name}: "
+        f"{len(jobs)} Israel jobs"
+    )
+
+    return jobs
 
 
 async def get_oracle_hcm_jobs():
@@ -123,7 +250,6 @@ async def get_oracle_hcm_jobs():
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
             "AppleWebKit/537.36 Chrome/152 Safari/537.36"
         ),
-        "Accept": "text/html,application/xhtml+xml",
         "Accept-Language": "en-US,en;q=0.9",
     }
 
@@ -132,31 +258,15 @@ async def get_oracle_hcm_jobs():
         headers=headers,
         follow_redirects=True,
     ) as client:
-        for company_name, config in ORACLE_HCM_SITES.items():
-            try:
-                response = await client.get(config["url"])
-                response.raise_for_status()
-
-            except httpx.HTTPError as error:
-                print(
-                    f"Failed getting Oracle HCM jobs "
-                    f"for {company_name}: "
-                    f"{type(error).__name__}: {error}"
+        for company_name, config in (
+            ORACLE_HCM_SITES.items()
+        ):
+            jobs.extend(
+                await _get_company_jobs(
+                    client,
+                    company_name,
+                    config,
                 )
-                continue
-
-            company_jobs = _parse_jobs(
-                response.text,
-                config["url"],
-                company_name,
-                config["source"],
             )
-
-            print(
-                f"Oracle HCM {company_name}: "
-                f"{len(company_jobs)} Israel jobs"
-            )
-
-            jobs.extend(company_jobs)
 
     return jobs
