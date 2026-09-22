@@ -50,11 +50,7 @@ WORKDAY_COMPANIES = {
         "host": "micron.wd1.myworkdayjobs.com",
         "tenant": "micron",
         "site": "External",
-    },
-    "Dell": {
-        "host": "dell.wd1.myworkdayjobs.com",
-        "tenant": "dell",
-        "site": "External",
+        "search_text": "Israel",
     },
     "Workday / HiredScore": {
         "host": "workday.wd5.myworkdayjobs.com",
@@ -65,6 +61,7 @@ WORKDAY_COMPANIES = {
         "host": "cisco.wd5.myworkdayjobs.com",
         "tenant": "cisco",
         "site": "Cisco_Careers",
+        "search_text": "Israel",
     },
     "Altera": {
         "host": "altera.wd1.myworkdayjobs.com",
@@ -75,6 +72,7 @@ WORKDAY_COMPANIES = {
         "host": "broadcom.wd1.myworkdayjobs.com",
         "tenant": "broadcom",
         "site": "External_Career",
+        "search_text": "Israel",
     },
     "Cadence": {
         "host": "cadence.wd1.myworkdayjobs.com",
@@ -101,7 +99,9 @@ WORKDAY_ISRAEL_MARKERS = [
     "il - ",
 ]
 
-COMPANY_TIMEOUT_SECONDS = 30
+COMPANY_TIMEOUT_SECONDS = 35
+WORKDAY_CONCURRENCY = 5
+REQUEST_RETRIES = 3
 
 
 def _is_israel_location(location):
@@ -111,6 +111,43 @@ def _is_israel_location(location):
         marker in location
         for marker in WORKDAY_ISRAEL_MARKERS
     )
+
+
+async def _request_with_retry(
+    client,
+    method,
+    url,
+    **kwargs,
+):
+    retryable_errors = (
+        httpx.ConnectError,
+        httpx.ConnectTimeout,
+        httpx.ReadTimeout,
+        httpx.RemoteProtocolError,
+    )
+
+    for attempt in range(1, REQUEST_RETRIES + 1):
+        try:
+            response = await client.request(
+                method,
+                url,
+                **kwargs,
+            )
+            response.raise_for_status()
+            return response
+
+        except retryable_errors as error:
+            if attempt == REQUEST_RETRIES:
+                raise
+
+            print(
+                f"Temporary Workday network error "
+                f"(attempt {attempt}/{REQUEST_RETRIES}): {error}"
+            )
+
+            await asyncio.sleep(attempt)
+
+    raise RuntimeError("unreachable")
 
 
 async def get_workday_job_details(
@@ -125,15 +162,16 @@ async def get_workday_job_details(
         f"{tenant}/{site}{external_path}"
     )
 
-    response = await client.get(
+    response = await _request_with_retry(
+        client,
+        "GET",
         url,
         headers={
             "Accept": "application/json",
             "Accept-Language": "en-US",
+            "Referer": f"https://{host}/{site}",
         },
     )
-
-    response.raise_for_status()
     data = response.json()
 
     return data.get("jobPostingInfo", {})
@@ -165,15 +203,20 @@ async def _get_company_jobs(
             "appliedFacets": {},
             "limit": limit,
             "offset": offset,
-            "searchText": "",
+            "searchText": config.get("search_text", ""),
         }
 
         try:
-            response = await client.post(
+            response = await _request_with_retry(
+                client,
+                "POST",
                 api_url,
                 json=payload,
+                headers={
+                    "Origin": f"https://{host}",
+                    "Referer": f"https://{host}/{site}",
+                },
             )
-            response.raise_for_status()
             data = response.json()
 
         except httpx.HTTPError as error:
@@ -284,33 +327,35 @@ async def _get_company_jobs(
 
 
 async def _get_company_jobs_with_timeout(
+    semaphore,
     client,
     company_name,
     config,
 ):
-    try:
-        return await asyncio.wait_for(
-            _get_company_jobs(
-                client,
-                company_name,
-                config,
-            ),
-            timeout=COMPANY_TIMEOUT_SECONDS,
-        )
+    async with semaphore:
+        try:
+            return await asyncio.wait_for(
+                _get_company_jobs(
+                    client,
+                    company_name,
+                    config,
+                ),
+                timeout=COMPANY_TIMEOUT_SECONDS,
+            )
 
-    except asyncio.TimeoutError:
-        print(
-            f"Workday {company_name}: timed out after "
-            f"{COMPANY_TIMEOUT_SECONDS}s, skipping it"
-        )
-        return []
+        except asyncio.TimeoutError:
+            print(
+                f"Workday {company_name}: timed out after "
+                f"{COMPANY_TIMEOUT_SECONDS}s, skipping it"
+            )
+            return []
 
-    except Exception as error:
-        print(
-            f"Workday {company_name}: failed with "
-            f"{type(error).__name__}: {error}"
-        )
-        return []
+        except Exception as error:
+            print(
+                f"Workday {company_name}: failed with "
+                f"{type(error).__name__}: {error}"
+            )
+            return []
 
 
 async def get_workday_jobs():
@@ -318,7 +363,13 @@ async def get_workday_jobs():
         "Accept": "application/json",
         "Accept-Language": "en-US",
         "Content-Type": "application/json",
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 Chrome/152 Safari/537.36"
+        ),
     }
+
+    semaphore = asyncio.Semaphore(WORKDAY_CONCURRENCY)
 
     timeout = httpx.Timeout(
         20.0,
@@ -332,6 +383,7 @@ async def get_workday_jobs():
         company_results = await asyncio.gather(
             *(
                 _get_company_jobs_with_timeout(
+                    semaphore,
                     client,
                     company_name,
                     config,
