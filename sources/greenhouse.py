@@ -33,7 +33,8 @@ GREENHOUSE_COMPANIES = {
 
 
 GREENHOUSE_API_BASE = "https://boards-api.greenhouse.io/v1/boards"
-GREENHOUSE_CONCURRENCY = 8
+GREENHOUSE_CONCURRENCY = 6
+GREENHOUSE_RETRIES = 3
 
 
 async def _get_company_jobs(
@@ -48,17 +49,45 @@ async def _get_company_jobs(
             f"{board_token}/jobs?content=true"
         )
 
-        try:
-            response = await client.get(url)
-            response.raise_for_status()
-            data = response.json()
+        response = None
 
-        except httpx.HTTPError as error:
-            print(
-                f"Failed getting Greenhouse jobs "
-                f"for {company_name}: {error}"
-            )
-            return []
+        for attempt in range(1, GREENHOUSE_RETRIES + 1):
+            try:
+                response = await client.get(url)
+                response.raise_for_status()
+                break
+
+            except (
+                httpx.ConnectError,
+                httpx.ConnectTimeout,
+                httpx.ReadTimeout,
+                httpx.RemoteProtocolError,
+            ) as error:
+                if attempt == GREENHOUSE_RETRIES:
+                    print(
+                        f"Failed getting Greenhouse jobs "
+                        f"for {company_name}: "
+                        f"{type(error).__name__}: {error}"
+                    )
+                    return []
+
+                print(
+                    f"Temporary Greenhouse network error "
+                    f"for {company_name} "
+                    f"(attempt {attempt}/{GREENHOUSE_RETRIES}): "
+                    f"{type(error).__name__}"
+                )
+                await asyncio.sleep(attempt)
+
+            except httpx.HTTPError as error:
+                print(
+                    f"Failed getting Greenhouse jobs "
+                    f"for {company_name}: "
+                    f"{type(error).__name__}: {error}"
+                )
+                return []
+
+        data = response.json()
 
         jobs = []
 
