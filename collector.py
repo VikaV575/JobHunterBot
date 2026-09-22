@@ -6,6 +6,7 @@ from sources.ashby import get_ashby_jobs
 from sources.bamboohr import get_bamboohr_jobs
 from sources.breezy import get_breezy_jobs
 from sources.comeet import get_comeet_jobs
+from sources.direct_company_sites import get_direct_company_jobs
 from sources.greenhouse import get_greenhouse_jobs
 from sources.google_careers import get_google_careers_jobs
 from sources.lever import get_lever_jobs
@@ -27,6 +28,7 @@ SOURCES = [
     ("Apple Careers", get_apple_jobs),
     ("Microsoft Careers", get_microsoft_jobs),
     ("Synopsys Careers", get_synopsys_jobs),
+    ("Direct company sites", get_direct_company_jobs),
     ("Greenhouse", get_greenhouse_jobs),
     ("Ashby", get_ashby_jobs),
     ("SmartRecruiters", get_smartrecruiters_jobs),
@@ -79,7 +81,11 @@ def _deduplicate_jobs(jobs):
         url = str(job.get("url", "")).strip().rstrip("/")
 
         if url:
-            key = ("url", url.lower())
+            key = (
+                "url",
+                url.lower(),
+                str(job.get("title", "")).strip().lower(),
+            )
         else:
             key = (
                 "job",
