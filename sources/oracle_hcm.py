@@ -40,6 +40,21 @@ def _request_items(data):
     return items
 
 
+def _reported_total_jobs(data):
+    totals = []
+
+    for item in _request_items(data):
+        if not isinstance(item, dict):
+            continue
+
+        value = item.get("TotalJobsCount")
+
+        if isinstance(value, int):
+            totals.append(value)
+
+    return max(totals, default=0)
+
+
 def _requisition_rows(data):
     rows = []
 
@@ -149,7 +164,6 @@ async def _get_company_jobs(
             "finder": finder,
             "limit": PAGE_SIZE,
             "offset": offset,
-            "q": f"SiteNumber='{site}'",
         }
 
         try:
@@ -180,8 +194,15 @@ async def _get_company_jobs(
             break
 
         rows = _requisition_rows(data)
+        reported_total = _reported_total_jobs(data)
 
         if not rows:
+            if reported_total:
+                print(
+                    f"Oracle HCM {company_name}: "
+                    f"API reports {reported_total} jobs but "
+                    "returned no requisition rows"
+                )
             break
 
         new_rows = 0
