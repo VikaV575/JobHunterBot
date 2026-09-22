@@ -29,6 +29,9 @@ GREENHOUSE_COMPANIES = {
     "Apiiro": "apiiro",
     "Salt Security": "saltsecurity",
     "BigID": "bigid",
+    "Oasis Security": "oasissecurity",
+    "BeamUP": "beamup",
+    "Forter": "forter",
 }
 
 
