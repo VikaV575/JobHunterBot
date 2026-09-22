@@ -33,10 +33,13 @@ async def get_pinpoint_jobs():
                 response.raise_for_status()
 
                 data = response.json()
-                postings = data.get(
-                    "data",
-                    data if isinstance(data, list) else []
-                )
+
+                if isinstance(data, list):
+                    postings = data
+                elif isinstance(data, dict):
+                    postings = data.get("data", [])
+                else:
+                    postings = []
 
                 for job in postings:
                     jobs.append({
