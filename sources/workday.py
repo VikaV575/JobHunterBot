@@ -15,21 +15,25 @@ WORKDAY_COMPANIES = {
         "host": "nvidia.wd5.myworkdayjobs.com",
         "tenant": "nvidia",
         "site": "NVIDIAExternalCareerSite",
+        "search_text": "Israel",
     },
     "HP": {
         "host": "hp.wd5.myworkdayjobs.com",
         "tenant": "hp",
         "site": "ExternalCareerSite",
+        "search_text": "Israel",
     },
     "Motorola Solutions": {
         "host": "motorolasolutions.wd5.myworkdayjobs.com",
         "tenant": "motorolasolutions",
         "site": "Careers",
+        "search_text": "Israel",
     },
     "HPE": {
         "host": "hpe.wd5.myworkdayjobs.com",
         "tenant": "hpe",
         "site": "ACJobSite",
+        "search_text": "Israel",
     },
     "Marvell": {
         "host": "marvell.wd1.myworkdayjobs.com",
@@ -56,6 +60,7 @@ WORKDAY_COMPANIES = {
         "host": "workday.wd5.myworkdayjobs.com",
         "tenant": "workday",
         "site": "Workday",
+        "search_text": "Israel",
     },
     "Cisco": {
         "host": "cisco.wd5.myworkdayjobs.com",
@@ -142,7 +147,8 @@ async def _request_with_retry(
 
             print(
                 f"Temporary Workday network error "
-                f"(attempt {attempt}/{REQUEST_RETRIES}): {error}"
+                f"(attempt {attempt}/{REQUEST_RETRIES}) "
+                f"{type(error).__name__}: {error}"
             )
 
             await asyncio.sleep(attempt)
