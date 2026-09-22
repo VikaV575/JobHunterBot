@@ -21,7 +21,6 @@ ASHBY_COMPANIES = {
     "Echo": "echo.ai",
     "Tavily": "tavily",
     "Matia": "matia",
-    "Act Security": "act",
     "Loora": "loora",
     "Oak": "oak",
 }
