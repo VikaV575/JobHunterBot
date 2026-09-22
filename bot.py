@@ -69,11 +69,19 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = "🔍 משרות רלוונטיות שמצאתי:\n\n"
 
         for job in feed_jobs:
+            matches = job.get("matches", [])
+            match_text = (
+                ", ".join(matches)
+                if matches
+                else "technical role"
+            )
+
             message += (
                 f"🎯 התאמה: {job['score']}%\n"
                 f"💼 {job['title']}\n"
                 f"🏢 {job['company_name']}\n"
                 f"📍 {job['location']}\n"
+                f"✅ למה: {match_text}\n"
                 f"🌐 {job['source']}\n"
                 f"🔗 {job['url']}\n\n"
             )
