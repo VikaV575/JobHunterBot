@@ -76,6 +76,16 @@ WORKDAY_COMPANIES = {
         "tenant": "broadcom",
         "site": "External_Career",
     },
+    "Cadence": {
+        "host": "cadence.wd1.myworkdayjobs.com",
+        "tenant": "cadence",
+        "site": "External_Careers",
+    },
+    "Cadence University": {
+        "host": "cadence.wd1.myworkdayjobs.com",
+        "tenant": "cadence",
+        "site": "Univ_Careers",
+    },
 }
 
 
