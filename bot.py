@@ -1,4 +1,6 @@
+import gc
 import os
+
 from dotenv import load_dotenv
 from telegram import Update
 from collector import get_jobs
@@ -28,7 +30,12 @@ def select_feed_jobs(
         if job.get("score", 0) <= min_score:
             continue
 
-        is_amazon = job.get("source") == "Amazon Jobs"
+        source = str(job.get("source", "")).lower()
+        company = str(job.get("company_name", "")).lower()
+        is_amazon = (
+            source in {"amazon", "amazon jobs"}
+            or company == "amazon"
+        )
 
         if is_amazon:
             if amazon_count >= max_amazon:
@@ -82,7 +89,22 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         relevant_jobs = filter_jobs(jobs_list)
         print(f"Relevant jobs: {len(relevant_jobs)}")
 
+        # The raw source results can contain thousands of large HTML job
+        # descriptions. Once filtering is done, release the irrelevant jobs
+        # before scoring/sending so the long-running Telegram bot does not
+        # keep unnecessary memory around.
+        del jobs_list
+        gc.collect()
+
         ranked_jobs = score_jobs(relevant_jobs)
+        del relevant_jobs
+
+        # Descriptions are only needed for filtering/scoring, not Telegram.
+        # Drop them before sending to keep the process lightweight.
+        for job in ranked_jobs:
+            job.pop("description", None)
+
+        gc.collect()
 
         feed_jobs = select_feed_jobs(
             ranked_jobs,
@@ -115,6 +137,11 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         print("Telegram jobs sent")
+
+        # Release the remaining job objects before returning to polling.
+        feed_jobs.clear()
+        ranked_jobs.clear()
+        gc.collect()
 
     except Exception as error:
         print(
