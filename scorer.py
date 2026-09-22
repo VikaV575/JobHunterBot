@@ -2,27 +2,28 @@ import re
 
 
 STUDENT_SCORE_RULES = {
-    "working student": 60,
-    "student software": 60,
-    "student developer": 60,
-    "student engineer": 60,
-    "student position": 58,
-    "student role": 58,
-    "internship": 58,
-    "intern": 56,
-    "student": 55,
-    "co-op": 52,
-    "coop": 52,
-    "new college grad": 45,
-    "new grad": 42,
-    "graduate software": 40,
-    "graduate engineer": 38,
-    "junior": 28,
-    "entry level": 25,
-    "entry-level": 25,
-    "undergraduate": 22,
-    "part time": 15,
-    "part-time": 15,
+    # Explicit student/intern signals should dominate the ranking.
+    "working student": 78,
+    "student software": 78,
+    "student developer": 78,
+    "student engineer": 78,
+    "student position": 76,
+    "student role": 76,
+    "internship": 76,
+    "intern": 75,
+    "student": 74,
+    "co-op": 72,
+    "coop": 72,
+
+    # Early-career signals are also highly relevant for this bot.
+    "new college grad": 70,
+    "new grad": 68,
+    "graduate software": 66,
+    "graduate engineer": 64,
+    "entry level": 62,
+    "entry-level": 62,
+    "undergraduate": 62,
+    "junior": 58,
 }
 
 
@@ -192,8 +193,8 @@ def _score_and_labels(job):
             )
 
             student_score = min(
-                28,
-                round(strongest[1] * 0.5),
+                55,
+                round(strongest[1] * 0.75),
             )
             strongest_student = (
                 f"{strongest[0]} in description"
@@ -280,12 +281,12 @@ def score_jobs(jobs):
         jobs,
         key=lambda job: (
             job["score"],
-            "student" in str(
-                job.get("title", "")
-            ).lower()
-            or "intern" in str(
-                job.get("title", "")
-            ).lower(),
+            any(
+                pattern.search(
+                    str(job.get("title", "")).lower()
+                )
+                for _, _, pattern in COMPILED_STUDENT_RULES
+            ),
         ),
         reverse=True,
     )
