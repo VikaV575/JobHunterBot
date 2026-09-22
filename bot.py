@@ -15,6 +15,27 @@ load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 
+def select_feed_jobs(ranked_jobs, max_total=10, max_amazon=3):
+    selected_jobs = []
+    amazon_count = 0
+
+    for job in ranked_jobs:
+        is_amazon = job.get("source") == "Amazon Jobs"
+
+        if is_amazon:
+            if amazon_count >= max_amazon:
+                continue
+
+            amazon_count += 1
+
+        selected_jobs.append(job)
+
+        if len(selected_jobs) >= max_total:
+            break
+
+    return selected_jobs
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🔍 מחפשת משרות...\n\n"
@@ -39,10 +60,15 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"Relevant jobs: {len(relevant_jobs)}")
 
         ranked_jobs = score_jobs(relevant_jobs)
+        feed_jobs = select_feed_jobs(
+            ranked_jobs,
+            max_total=10,
+            max_amazon=3,
+        )
 
         message = "🔍 משרות רלוונטיות שמצאתי:\n\n"
 
-        for job in ranked_jobs[:10]:
+        for job in feed_jobs:
             message += (
                 f"🎯 התאמה: {job['score']}%\n"
                 f"💼 {job['title']}\n"
