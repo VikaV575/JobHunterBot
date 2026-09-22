@@ -2,54 +2,26 @@ import httpx
 
 
 GREENHOUSE_COMPANIES = {
-    "Gong": {
-        "token": "gongio",
-        "region": "us",
-    },
-    "At-Bay": {
-        "token": "atbayjobs",
-        "region": "us",
-    },
-    "Pagaya": {
-        "token": "pagayais",
-        "region": "us",
-    },
-    "Pendo": {
-        "token": "pendo",
-        "region": "us",
-    },
-    "DoiT": {
-        "token": "doitintl",
-        "region": "us",
-    },
-    "Aidoc": {
-        "token": "aidocmedical",
-        "region": "eu",
-    },
-    "accessiBe": {
-        "token": "accessibe",
-        "region": "eu",
-    },
+    "Gong": "gongio",
+    "At-Bay": "atbayjobs",
+    "Pagaya": "pagayais",
+    "Pendo": "pendo",
+    "DoiT": "doitintl",
+    "Aidoc": "aidocmedical",
+    "accessiBe": "accessibe",
 }
 
 
-def _api_host(region):
-    if region == "eu":
-        return "https://boards-api.eu.greenhouse.io"
-
-    return "https://boards-api.greenhouse.io"
+GREENHOUSE_API_BASE = "https://boards-api.greenhouse.io/v1/boards"
 
 
 async def get_greenhouse_jobs():
     jobs = []
 
     async with httpx.AsyncClient(timeout=20.0) as client:
-        for company_name, config in GREENHOUSE_COMPANIES.items():
-            board_token = config["token"]
-            host = _api_host(config.get("region", "us"))
-
+        for company_name, board_token in GREENHOUSE_COMPANIES.items():
             url = (
-                f"{host}/v1/boards/"
+                f"{GREENHOUSE_API_BASE}/"
                 f"{board_token}/jobs?content=true"
             )
 
