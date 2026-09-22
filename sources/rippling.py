@@ -50,11 +50,24 @@ async def get_rippling_jobs():
                 response.raise_for_status()
 
                 data = response.json()
-                postings = (
-                    data
-                    if isinstance(data, list)
-                    else data.get("jobs", data.get("result", []))
-                )
+
+                if isinstance(data, list):
+                    postings = data
+                elif isinstance(data, dict):
+                    postings = (
+                        data.get("jobs")
+                        or data.get("result")
+                        or data.get("data")
+                        or []
+                    )
+                    if isinstance(postings, dict):
+                        postings = (
+                            postings.get("jobs")
+                            or postings.get("data")
+                            or []
+                        )
+                else:
+                    postings = []
 
                 for job in postings:
                     job_id = (
