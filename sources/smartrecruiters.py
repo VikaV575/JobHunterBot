@@ -5,6 +5,7 @@ SMARTRECRUITERS_COMPANIES = {
     "Nexar": "NexarInc",
     "Renesas": "RenesasElectronics",
     "Western Digital": "WesternDigital",
+    "Wix": "Wix2",
 }
 
 
