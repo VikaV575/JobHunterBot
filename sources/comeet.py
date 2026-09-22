@@ -102,6 +102,32 @@ def _title_from_url(url):
     return path_parts[-2].replace("-", " ").strip().title()
 
 
+def _context_for_link(link):
+    fallback = link.get_text(" ", strip=True)
+
+    for parent in link.parents:
+        if getattr(parent, "name", None) not in {
+            "article",
+            "li",
+            "section",
+            "div",
+        }:
+            continue
+
+        text = parent.get_text(" ", strip=True)
+
+        if any(
+            hint.lower() in text.lower()
+            for hint in ISRAEL_LOCATION_HINTS
+        ):
+            return text
+
+        if len(text) < 500:
+            fallback = text
+
+    return fallback
+
+
 def _parse_board(html, board_url, company_name):
     soup = BeautifulSoup(html, "html.parser")
     found = {}
@@ -117,19 +143,7 @@ def _parse_board(html, board_url, company_name):
         if title.lower() in GENERIC_LINK_TEXT:
             title = ""
 
-        card = (
-            link.find_parent("article")
-            or link.find_parent("li")
-            or link.find_parent("section")
-            or link.find_parent("div")
-        )
-
-        context = (
-            card.get_text(" ", strip=True)
-            if card is not None
-            else title
-        )
-
+        context = _context_for_link(link)
         location = _extract_location(context)
 
         existing = found.get(absolute_url)
