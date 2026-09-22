@@ -6,11 +6,14 @@ from sources.ashby import get_ashby_jobs
 from sources.comeet import get_comeet_jobs
 from sources.direct_company_sites import get_direct_company_jobs
 from sources.devjobs import get_devjobs_jobs
+from sources.eightfold import get_eightfold_jobs
 from sources.greenhouse import get_greenhouse_jobs
 from sources.google_careers import get_google_careers_jobs
 from sources.jobnet import get_jobnet_jobs
+from sources.iai import get_iai_jobs
 from sources.lever import get_lever_jobs
 from sources.microsoft import get_microsoft_jobs
+from sources.oracle_hcm import get_oracle_hcm_jobs
 from sources.personio import get_personio_jobs
 from sources.recruitee import get_recruitee_jobs
 from sources.rippling import get_rippling_jobs
@@ -31,6 +34,9 @@ SOURCES = [
     ("SAP Careers", get_sap_jobs),
     ("DevJobs", get_devjobs_jobs),
     ("Jobnet", get_jobnet_jobs),
+    ("IAI Careers", get_iai_jobs),
+    ("Oracle HCM", get_oracle_hcm_jobs),
+    ("Eightfold", get_eightfold_jobs),
     ("Direct company sites", get_direct_company_jobs),
     ("Greenhouse", get_greenhouse_jobs),
     ("Ashby", get_ashby_jobs),
