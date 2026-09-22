@@ -32,6 +32,7 @@ ISRAEL_LOCATIONS = [
     "ra'anana",
     "kfar saba",
     "petah tikva",
+    "petah-tikva",
     "netanya",
     "caesarea",
     "rehovot",
@@ -41,4 +42,9 @@ ISRAEL_LOCATIONS = [
     "jerusalem",
     "beer sheva",
     "be'er sheva",
+    "migdal ha'emek",
+    "migdal haemek",
+    "hadera",
+    "yavne",
+    "glil yam",
 ]
