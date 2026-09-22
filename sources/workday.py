@@ -76,6 +76,8 @@ WORKDAY_ISRAEL_MARKERS = [
     "il - ",
 ]
 
+COMPANY_TIMEOUT_SECONDS = 30
+
 
 def _is_israel_location(location):
     location = location.lower()
@@ -256,6 +258,36 @@ async def _get_company_jobs(
     return jobs
 
 
+async def _get_company_jobs_with_timeout(
+    client,
+    company_name,
+    config,
+):
+    try:
+        return await asyncio.wait_for(
+            _get_company_jobs(
+                client,
+                company_name,
+                config,
+            ),
+            timeout=COMPANY_TIMEOUT_SECONDS,
+        )
+
+    except asyncio.TimeoutError:
+        print(
+            f"Workday {company_name}: timed out after "
+            f"{COMPANY_TIMEOUT_SECONDS}s, skipping it"
+        )
+        return []
+
+    except Exception as error:
+        print(
+            f"Workday {company_name}: failed with "
+            f"{type(error).__name__}: {error}"
+        )
+        return []
+
+
 async def get_workday_jobs():
     headers = {
         "Accept": "application/json",
@@ -263,13 +295,18 @@ async def get_workday_jobs():
         "Content-Type": "application/json",
     }
 
+    timeout = httpx.Timeout(
+        20.0,
+        connect=10.0,
+    )
+
     async with httpx.AsyncClient(
-        timeout=20.0,
+        timeout=timeout,
         headers=headers,
     ) as client:
         company_results = await asyncio.gather(
             *(
-                _get_company_jobs(
+                _get_company_jobs_with_timeout(
                     client,
                     company_name,
                     config,
