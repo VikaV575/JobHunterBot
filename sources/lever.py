@@ -2,23 +2,57 @@ import httpx
 
 
 LEVER_COMPANIES = {
-    "WalkMe": "walkme",
-    "Palantir": "palantir",
-    "Zadara": "Zadara",
-    "Tonkean": "tonkean",
-    "TRAILD": "traildsoftware",
-    "Houzz": "houzz",
+    "WalkMe": {
+        "site": "walkme",
+        "region": "global",
+    },
+    "Palantir": {
+        "site": "palantir",
+        "region": "global",
+    },
+    "Zadara": {
+        "site": "Zadara",
+        "region": "global",
+    },
+    "Tonkean": {
+        "site": "tonkean",
+        "region": "global",
+    },
+    "TRAILD": {
+        "site": "traildsoftware",
+        "region": "global",
+    },
+    "Houzz": {
+        "site": "houzz",
+        "region": "global",
+    },
+    "Mobileye": {
+        "site": "mobileye",
+        "region": "eu",
+    },
 }
+
+
+def _api_base(region):
+    if region == "eu":
+        return "https://api.eu.lever.co/v0/postings"
+
+    return "https://api.lever.co/v0/postings"
 
 
 async def get_lever_jobs():
     jobs = []
 
     async with httpx.AsyncClient(timeout=20.0) as client:
-        for company_name, site_name in LEVER_COMPANIES.items():
+        for company_name, config in LEVER_COMPANIES.items():
+            site_name = config["site"]
+            base_url = _api_base(
+                config.get("region", "global")
+            )
+
             url = (
-                f"https://api.lever.co/v0/postings/"
-                f"{site_name}?mode=json"
+                f"{base_url}/{site_name}"
+                "?mode=json"
             )
 
             try:
@@ -42,7 +76,11 @@ async def get_lever_jobs():
                             "descriptionPlain",
                             ""
                         ),
-                        "source": "Lever",
+                        "source": (
+                            "Lever EU"
+                            if config.get("region") == "eu"
+                            else "Lever"
+                        ),
                     })
 
             except httpx.HTTPError as error:
