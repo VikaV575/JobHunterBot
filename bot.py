@@ -36,12 +36,30 @@ def select_feed_jobs(ranked_jobs, max_total=10, max_amazon=3):
     return selected_jobs
 
 
+def format_job_message(job, index):
+    matches = job.get("matches", [])
+    match_text = (
+        ", ".join(matches)
+        if matches
+        else "technical role"
+    )
+
+    return (
+        f"{index}. 🎯 התאמה: {job['score']}%\n"
+        f"💼 {job['title']}\n"
+        f"🏢 {job['company_name']}\n"
+        f"📍 {job['location']}\n"
+        f"✅ למה: {match_text}\n"
+        f"🌐 {job['source']}\n"
+        f"🔗 {job['url']}"
+    )
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🔍 מחפשת משרות...\n\n"
-        "1. Software Student - NVIDIA\n"
-        "2. Validation Student - Intel\n"
-        "3. Backend Student - Check Point"
+        "שלחי /jobs כדי לקבל את המשרות "
+        "הרלוונטיות ביותר שמצאתי."
     )
 
 
@@ -60,38 +78,42 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"Relevant jobs: {len(relevant_jobs)}")
 
         ranked_jobs = score_jobs(relevant_jobs)
+
         feed_jobs = select_feed_jobs(
             ranked_jobs,
             max_total=10,
             max_amazon=3,
         )
 
-        message = "🔍 משרות רלוונטיות שמצאתי:\n\n"
+        print(
+            f"Sending {len(feed_jobs)} jobs to Telegram..."
+        )
 
-        for job in feed_jobs:
-            matches = job.get("matches", [])
-            match_text = (
-                ", ".join(matches)
-                if matches
-                else "technical role"
+        await update.message.reply_text(
+            f"🔍 מצאתי {len(relevant_jobs)} משרות "
+            f"רלוונטיות. הנה 10 המובילות:"
+        )
+
+        for index, job in enumerate(
+            feed_jobs,
+            start=1,
+        ):
+            await update.message.reply_text(
+                format_job_message(job, index)
             )
 
-            message += (
-                f"🎯 התאמה: {job['score']}%\n"
-                f"💼 {job['title']}\n"
-                f"🏢 {job['company_name']}\n"
-                f"📍 {job['location']}\n"
-                f"✅ למה: {match_text}\n"
-                f"🌐 {job['source']}\n"
-                f"🔗 {job['url']}\n\n"
-            )
-
-        await update.message.reply_text(message)
+        print("Telegram jobs sent")
 
     except Exception as error:
-        print("ERROR IN /jobs:", error)
+        print(
+            "ERROR IN /jobs:",
+            type(error).__name__,
+            error,
+        )
+
         await update.message.reply_text(
-            f"❌ קרתה שגיאה: {type(error).__name__}"
+            f"❌ קרתה שגיאה: "
+            f"{type(error).__name__}: {error}"
         )
 
 
