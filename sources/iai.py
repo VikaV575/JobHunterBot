@@ -22,7 +22,7 @@ IAI_STUDENT_JOBS_URL = (
     "%D7%A1%D7%98%D7%95%D7%93%D7%A0%D7%98"
 )
 
-DETAIL_CONCURRENCY = 6
+DETAIL_CONCURRENCY = 12
 BROWSER_MAX_PAGES = 30
 BROWSER_WAIT_SECONDS = 12
 
@@ -358,14 +358,30 @@ async def get_iai_jobs():
         _discover_with_browser
     )
 
+    timeout = httpx.Timeout(
+        12.0,
+        connect=8.0,
+    )
+    limits = httpx.Limits(
+        max_connections=16,
+        max_keepalive_connections=12,
+    )
+
     async with httpx.AsyncClient(
-        timeout=20.0,
+        timeout=timeout,
+        limits=limits,
         headers=headers,
         follow_redirects=True,
     ) as client:
-        fallback_urls = await _discover_http_fallback(
-            client
-        )
+        # If browser discovery worked, do not spend extra time probing the
+        # JavaScript listing again. Keep the HTTP fallback only for machines
+        # where Chrome/Selenium discovery failed.
+        if browser_urls:
+            fallback_urls = []
+        else:
+            fallback_urls = await _discover_http_fallback(
+                client
+            )
 
         urls = list(
             dict.fromkeys(
