@@ -14,38 +14,6 @@ DIRECT_COMPANIES = {
         "job_pattern": r"/careers/[0-9a-fA-F-]{30,}$",
         "prefiltered_israel": False,
     },
-    "Check Point": {
-        "urls": [
-            (
-                "https://careers.checkpoint.com/index.php"
-                "?m=cpcareers&a=jobs&country_code=IL"
-            ),
-        ],
-        "job_pattern": r"joborderid=\d+",
-        "prefiltered_israel": True,
-    },
-    "CyberArk": {
-        "urls": [
-            (
-                "https://careers.cyberark.com/search/"
-                "?q=&locationsearch=israel"
-            ),
-            (
-                "https://careers.cyberark.com/search/"
-                "?q=&locationsearch=israel&startrow=25"
-            ),
-            (
-                "https://careers.cyberark.com/search/"
-                "?q=&locationsearch=israel&startrow=50"
-            ),
-            (
-                "https://careers.cyberark.com/search/"
-                "?q=&locationsearch=israel&startrow=75"
-            ),
-        ],
-        "job_pattern": r"/job/",
-        "prefiltered_israel": True,
-    },
     "Palo Alto Networks": {
         "urls": [
             (
@@ -86,6 +54,13 @@ DIRECT_COMPANIES = {
         "job_pattern": r"/careers/job/\d+",
         "prefiltered_israel": False,
     },
+}
+
+# These sites currently block automated requests with HTTP 403.
+# Repeated requests only add noise and contribute no jobs.
+BLOCKED_DIRECT_COMPANIES = {
+    "Check Point": "HTTP 403",
+    "CyberArk": "HTTP 403",
 }
 
 
