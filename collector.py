@@ -1,17 +1,21 @@
 import asyncio
 
 from sources.amazon import get_amazon_jobs
+from sources.apple import get_apple_jobs
 from sources.ashby import get_ashby_jobs
 from sources.bamboohr import get_bamboohr_jobs
 from sources.breezy import get_breezy_jobs
 from sources.comeet import get_comeet_jobs
 from sources.greenhouse import get_greenhouse_jobs
+from sources.google_careers import get_google_careers_jobs
 from sources.lever import get_lever_jobs
+from sources.microsoft import get_microsoft_jobs
 from sources.personio import get_personio_jobs
 from sources.pinpoint import get_pinpoint_jobs
 from sources.recruitee import get_recruitee_jobs
 from sources.rippling import get_rippling_jobs
 from sources.smartrecruiters import get_smartrecruiters_jobs
+from sources.synopsys import get_synopsys_jobs
 from sources.teamtailor import get_teamtailor_jobs
 from sources.workable import get_workable_jobs
 from sources.workday import get_workday_jobs
@@ -19,6 +23,10 @@ from sources.workday import get_workday_jobs
 
 SOURCES = [
     ("Lever", get_lever_jobs),
+    ("Google Careers", get_google_careers_jobs),
+    ("Apple Careers", get_apple_jobs),
+    ("Microsoft Careers", get_microsoft_jobs),
+    ("Synopsys Careers", get_synopsys_jobs),
     ("Greenhouse", get_greenhouse_jobs),
     ("Ashby", get_ashby_jobs),
     ("SmartRecruiters", get_smartrecruiters_jobs),
