@@ -35,12 +35,25 @@ SOURCES = [
     ("Pinpoint", get_pinpoint_jobs),
 ]
 
+SOURCE_TIMEOUT_SECONDS = 45
+
 
 async def _collect_source(source_name, source_function):
     try:
-        jobs = await source_function()
+        jobs = await asyncio.wait_for(
+            source_function(),
+            timeout=SOURCE_TIMEOUT_SECONDS,
+        )
+
         print(f"{source_name}: {len(jobs)}")
         return jobs
+
+    except asyncio.TimeoutError:
+        print(
+            f"{source_name}: timed out after "
+            f"{SOURCE_TIMEOUT_SECONDS}s, skipping it"
+        )
+        return []
 
     except Exception as error:
         print(
