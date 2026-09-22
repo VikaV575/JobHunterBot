@@ -3,6 +3,7 @@ import re
 from config import (
     EXCLUDE_KEYWORDS,
     ISRAEL_LOCATIONS,
+    NON_TECH_TITLE_KEYWORDS,
     STUDENT_KEYWORDS,
     TECH_CONTEXT_KEYWORDS,
     TECH_TITLE_KEYWORDS,
@@ -40,12 +41,21 @@ def is_relevant_job(job):
     title = str(job.get("title", ""))
     description = str(job.get("description", ""))
 
-    is_excluded = _contains_any(
-        title,
-        EXCLUDE_KEYWORDS,
+    if _contains_any(title, EXCLUDE_KEYWORDS):
+        return False
+
+    if _contains_any(title, NON_TECH_TITLE_KEYWORDS):
+        return False
+
+    # This bot is student-first: a role must explicitly look like a
+    # student/intern/co-op/undergraduate role. Junior, entry-level and
+    # ordinary full-time engineering roles are intentionally excluded.
+    student_signal = (
+        _contains_any(title, STUDENT_KEYWORDS)
+        or _contains_any(description, STUDENT_KEYWORDS)
     )
 
-    if is_excluded:
+    if not student_signal:
         return False
 
     strong_tech_title = _contains_any(
@@ -58,26 +68,22 @@ def is_relevant_job(job):
         WEAK_TECH_TITLE_KEYWORDS,
     )
 
-    student_signal = (
-        _contains_any(title, STUDENT_KEYWORDS)
-        or _contains_any(description, STUDENT_KEYWORDS)
-    )
-
     technical_context = _contains_any(
         f"{title} {description}",
         TECH_CONTEXT_KEYWORDS,
     )
 
-    # Keep clearly technical titles.
+    # A clear technical title plus a student signal is enough.
     if strong_tech_title:
         return True
 
-    # Keep broad student/intern titles only when their content is technical.
-    if student_signal and technical_context:
+    # Broad titles such as "R&D Intern" or "Engineering Student" are kept
+    # only when the description is clearly technical.
+    if weak_tech_title and technical_context:
         return True
 
-    # Keep broad engineering/R&D titles when they have clear CS/tech context.
-    if weak_tech_title and technical_context:
+    # Generic "Intern" / "Student" titles must have strong technical context.
+    if technical_context:
         return True
 
     return False
