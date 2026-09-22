@@ -42,7 +42,9 @@ async def get_recruitee_jobs():
             url = f"https://{slug}.recruitee.com/api/offers/"
 
             headers = {"Accept": "application/json"}
-            token = os.getenv(config.get("token_env", ""))
+            token_env = config.get("token_env")
+            token = os.getenv(token_env) if token_env else None
+
             if token:
                 headers["X-Careers-Sites-Token"] = token
 
@@ -51,7 +53,12 @@ async def get_recruitee_jobs():
                 response.raise_for_status()
                 data = response.json()
 
-                offers = data.get("offers", data if isinstance(data, list) else [])
+                if isinstance(data, list):
+                    offers = data
+                elif isinstance(data, dict):
+                    offers = data.get("offers", [])
+                else:
+                    offers = []
 
                 for job in offers:
                     location = (
