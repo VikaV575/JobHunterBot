@@ -2,16 +2,21 @@ import asyncio
 from datetime import date, datetime, timedelta
 import re
 import xml.etree.ElementTree as ET
+from urllib.parse import urljoin
 
 import httpx
 from bs4 import BeautifulSoup
 
 
 IAI_BASE = "https://jobs.iai.co.il"
-IAI_SITEMAP = f"{IAI_BASE}/wp-sitemap.xml"
+IAI_STUDENT_JOBS_URL = (
+    f"{IAI_BASE}/jobs/?tp="
+    "%D7%9E%D7%A9%D7%A8%D7%AA+"
+    "%D7%A1%D7%98%D7%95%D7%93%D7%A0%D7%98"
+)
 
 MAX_JOB_AGE_DAYS = 180
-MAX_JOB_PAGES = 140
+MAX_JOB_PAGES = 220
 DETAIL_CONCURRENCY = 6
 
 STUDENT_MARKERS = [
@@ -78,7 +83,7 @@ def _xml_locs(xml_text):
                     lastmod = (child.text or "").strip()
 
             if loc:
-                items.append((loc, lastmod))
+                items.append(("url", loc, lastmod))
 
         elif element.tag.endswith("sitemap"):
             loc = ""
@@ -88,7 +93,7 @@ def _xml_locs(xml_text):
                     loc = (child.text or "").strip()
 
             if loc:
-                items.append((loc, ""))
+                items.append(("sitemap", loc, ""))
 
     return items
 
@@ -149,17 +154,20 @@ def _parse_job_page(html, url):
     ):
         return None
 
+    title = ""
+
     title_node = soup.find("h1")
 
     if title_node:
         title = title_node.get_text(" ", strip=True)
-    else:
-        title = ""
 
     if not title:
         title_node = soup.find(
             ["h2", "h3"],
-            string=re.compile("סטודנט|student", re.IGNORECASE),
+            string=re.compile(
+                "סטודנט|student",
+                re.IGNORECASE,
+            ),
         )
 
         if title_node:
@@ -196,56 +204,159 @@ async def _fetch_job(
         )
 
 
-async def _discover_job_urls(client):
+def _job_urls_from_html(html):
+    soup = BeautifulSoup(html, "html.parser")
+    urls = []
+
+    for link in soup.find_all("a", href=True):
+        href = link.get("href", "")
+        absolute_url = urljoin(IAI_BASE, href)
+
+        if re.search(
+            r"https://jobs\.iai\.co\.il/job/\d+/?$",
+            absolute_url,
+        ):
+            urls.append(absolute_url.rstrip("/") + "/")
+
+    return urls
+
+
+async def _discover_from_student_page(client):
     try:
-        response = await client.get(IAI_SITEMAP)
-        response.raise_for_status()
-    except httpx.HTTPError as error:
-        print(
-            f"Failed getting IAI sitemap: "
-            f"{type(error).__name__}: {error}"
+        response = await client.get(
+            IAI_STUDENT_JOBS_URL
         )
+        response.raise_for_status()
+    except httpx.HTTPError:
         return []
 
-    root_items = _xml_locs(response.text)
+    return _job_urls_from_html(response.text)
 
-    child_sitemaps = [
-        loc
-        for loc, _ in root_items
-        if "job" in loc.lower()
+
+async def _discover_from_rest_search(client):
+    urls = []
+
+    endpoints = [
+        (
+            f"{IAI_BASE}/wp-json/wp/v2/search",
+            {
+                "search": "סטודנט",
+                "per_page": 100,
+                "page": 1,
+            },
+        ),
+        (
+            f"{IAI_BASE}/wp-json/wp/v2/search",
+            {
+                "search": "student",
+                "per_page": 100,
+                "page": 1,
+            },
+        ),
     ]
 
-    # Some WordPress installations do not expose an obvious job-named
-    # child sitemap. Try the standard custom-post-type sitemap as fallback.
-    if not child_sitemaps:
-        child_sitemaps = [
-            f"{IAI_BASE}/wp-sitemap-posts-job-1.xml",
-            f"{IAI_BASE}/wp-sitemap-posts-jobs-1.xml",
-        ]
-
-    candidates = []
-
-    for sitemap_url in child_sitemaps[:4]:
+    for endpoint, params in endpoints:
         try:
-            sitemap_response = await client.get(
-                sitemap_url
+            response = await client.get(
+                endpoint,
+                params=params,
+                headers={"Accept": "application/json"},
             )
-            sitemap_response.raise_for_status()
+            response.raise_for_status()
+            data = response.json()
+        except (
+            httpx.HTTPError,
+            ValueError,
+        ):
+            continue
+
+        if not isinstance(data, list):
+            continue
+
+        for item in data:
+            url = str(
+                item.get("url")
+                or item.get("link")
+                or ""
+            )
+
+            if "/job/" in url:
+                urls.append(url)
+
+    return urls
+
+
+async def _discover_from_sitemaps(client):
+    urls = []
+    sitemap_queue = [
+        f"{IAI_BASE}/wp-sitemap.xml",
+        f"{IAI_BASE}/sitemap_index.xml",
+        f"{IAI_BASE}/sitemap.xml",
+        f"{IAI_BASE}/job-sitemap.xml",
+        f"{IAI_BASE}/wp-sitemap-posts-job-1.xml",
+        f"{IAI_BASE}/wp-sitemap-posts-jobs-1.xml",
+        f"{IAI_BASE}/wp-sitemap-posts-ext_job-1.xml",
+    ]
+
+    seen_sitemaps = set()
+
+    while (
+        sitemap_queue
+        and len(seen_sitemaps) < 30
+        and len(urls) < MAX_JOB_PAGES
+    ):
+        sitemap_url = sitemap_queue.pop(0)
+
+        if sitemap_url in seen_sitemaps:
+            continue
+
+        seen_sitemaps.add(sitemap_url)
+
+        try:
+            response = await client.get(sitemap_url)
+            response.raise_for_status()
         except httpx.HTTPError:
             continue
 
-        for loc, lastmod in _xml_locs(
-            sitemap_response.text
-        ):
+        items = _xml_locs(response.text)
+
+        for item_type, loc, lastmod in items:
+            if item_type == "sitemap":
+                if (
+                    loc.startswith(IAI_BASE)
+                    and loc not in seen_sitemaps
+                ):
+                    sitemap_queue.append(loc)
+
+                continue
+
             if "/job/" not in loc:
                 continue
 
             if not _is_recent(lastmod):
                 continue
 
-            candidates.append(loc)
+            urls.append(loc)
 
-    return list(dict.fromkeys(candidates))[
+    return urls
+
+
+async def _discover_job_urls(client):
+    page_urls, rest_urls, sitemap_urls = (
+        await asyncio.gather(
+            _discover_from_student_page(client),
+            _discover_from_rest_search(client),
+            _discover_from_sitemaps(client),
+        )
+    )
+
+    urls = [
+        *page_urls,
+        *rest_urls,
+        *sitemap_urls,
+    ]
+
+    return list(dict.fromkeys(urls))[
         :MAX_JOB_PAGES
     ]
 
@@ -256,7 +367,10 @@ async def get_iai_jobs():
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
             "AppleWebKit/537.36 Chrome/152 Safari/537.36"
         ),
-        "Accept": "text/html,application/xhtml+xml,application/xml",
+        "Accept": (
+            "text/html,application/xhtml+xml,"
+            "application/xml,application/json"
+        ),
         "Accept-Language": "he-IL,he;q=0.9,en;q=0.8",
     }
 
@@ -267,8 +381,12 @@ async def get_iai_jobs():
     ) as client:
         urls = await _discover_job_urls(client)
 
+        print(
+            f"IAI Careers: discovered "
+            f"{len(urls)} candidate job URLs"
+        )
+
         if not urls:
-            print("IAI Careers: 0 discovered job URLs")
             return []
 
         semaphore = asyncio.Semaphore(
