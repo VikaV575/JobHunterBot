@@ -23,6 +23,14 @@ ASHBY_COMPANIES = {
     "Matia": "matia",
     "Loora": "loora",
     "Oak": "oak",
+    "Zafran Security": "zafran-security",
+    "Moon Active": "moonactive",
+    "Lakera": "lakera.ai",
+    "OurRitual": "ourritual",
+    "Sweep": "sweep",
+    "Swap": "swap",
+    "Ledge": "ledge",
+    "Snappy": "Snappy",
 }
 
 
