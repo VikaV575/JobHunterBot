@@ -17,6 +17,8 @@ STUDENT_SCORE_RULES = {
     "co-op": 76,
     "coop": 76,
     "undergraduate": 74,
+    "entry level": 68,
+    "entry-level": 68,
 }
 
 
