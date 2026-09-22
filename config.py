@@ -1,5 +1,5 @@
-# Signals that the role is genuinely intended for a current student/intern.
-# Deliberately excludes junior / entry-level / new-grad roles.
+# Signals that the role is intended for a current student/intern or true entry-level candidate.
+# Junior / new-grad roles remain excluded.
 STUDENT_KEYWORDS = [
     "working student",
     "student position",
@@ -15,6 +15,8 @@ STUDENT_KEYWORDS = [
     "co-op",
     "coop",
     "undergraduate",
+    "entry level",
+    "entry-level",
 ]
 
 
