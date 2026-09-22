@@ -44,16 +44,6 @@ DIRECT_COMPANIES = {
         "job_pattern": r"/en/job/",
         "prefiltered_israel": True,
     },
-    "Qualcomm": {
-        "urls": [
-            (
-                "https://careers.qualcomm.com/careers"
-                "?query=&location=Israel&domain=qualcomm.com"
-            ),
-        ],
-        "job_pattern": r"/careers/job/\d+",
-        "prefiltered_israel": False,
-    },
 }
 
 # These sites currently block automated requests with HTTP 403.
@@ -61,6 +51,7 @@ DIRECT_COMPANIES = {
 BLOCKED_DIRECT_COMPANIES = {
     "Check Point": "HTTP 403",
     "CyberArk": "HTTP 403",
+    "Qualcomm": "JavaScript-rendered careers site; direct HTML scraper returns 0",
 }
 
 
