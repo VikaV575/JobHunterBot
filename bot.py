@@ -15,11 +15,19 @@ load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 
-def select_feed_jobs(ranked_jobs, max_total=10, max_amazon=3):
+def select_feed_jobs(
+    ranked_jobs,
+    min_score=50,
+    max_amazon=3,
+):
     selected_jobs = []
     amazon_count = 0
 
     for job in ranked_jobs:
+        # "Above 50%" means strictly greater than 50.
+        if job.get("score", 0) <= min_score:
+            continue
+
         is_amazon = job.get("source") == "Amazon Jobs"
 
         if is_amazon:
@@ -29,9 +37,6 @@ def select_feed_jobs(ranked_jobs, max_total=10, max_amazon=3):
             amazon_count += 1
 
         selected_jobs.append(job)
-
-        if len(selected_jobs) >= max_total:
-            break
 
     return selected_jobs
 
@@ -58,8 +63,8 @@ def format_job_message(job, index):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🔍 מחפשת משרות...\n\n"
-        "שלחי /jobs כדי לקבל את המשרות "
-        "הרלוונטיות ביותר שמצאתי."
+        "שלחי /jobs כדי לקבל את כל המשרות "
+        "עם התאמה מעל 50%."
     )
 
 
@@ -81,17 +86,24 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         feed_jobs = select_feed_jobs(
             ranked_jobs,
-            max_total=10,
+            min_score=50,
             max_amazon=3,
         )
 
         print(
-            f"Sending {len(feed_jobs)} jobs to Telegram..."
+            f"Sending {len(feed_jobs)} jobs above 50% "
+            "to Telegram..."
         )
 
+        if not feed_jobs:
+            await update.message.reply_text(
+                "לא מצאתי כרגע משרות עם התאמה מעל 50%."
+            )
+            return
+
         await update.message.reply_text(
-            f"🔍 מצאתי {len(relevant_jobs)} משרות "
-            f"רלוונטיות. הנה 10 המובילות:"
+            f"🔍 מצאתי {len(feed_jobs)} משרות "
+            f"עם התאמה מעל 50%."
         )
 
         for index, job in enumerate(
