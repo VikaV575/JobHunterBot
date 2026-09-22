@@ -48,7 +48,7 @@ def is_relevant_job(job):
         return False
 
     # This bot is student-first: a role must explicitly look like a
-    # student/intern/co-op/undergraduate role. Junior, entry-level and
+    # student/intern/co-op/undergraduate/entry-level role. Junior and
     # ordinary full-time engineering roles are intentionally excluded.
     student_signal = (
         _contains_any(title, STUDENT_KEYWORDS)
