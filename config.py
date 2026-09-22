@@ -17,6 +17,8 @@ STUDENT_KEYWORDS = [
     "undergraduate",
     "entry level",
     "entry-level",
+    "סטודנט",
+    "מתמחה",
 ]
 
 
@@ -69,6 +71,17 @@ TECH_TITLE_KEYWORDS = [
     "pre-silicon",
     "silicon validation",
     "hardware validation",
+    "תוכנה",
+    "פיתוח תוכנה",
+    "הנדסת תוכנה",
+    "מהנדס תוכנה",
+    "אוטומציה",
+    "סייבר",
+    "בדיקות תוכנה",
+    "וריפיקציה",
+    "ולידציה",
+    "אלגוריתמים",
+    "קושחה",
 ]
 
 
@@ -137,6 +150,18 @@ TECH_CONTEXT_KEYWORDS = [
     "data structures",
     "machine learning",
     "computer vision",
+    "מדעי המחשב",
+    "הנדסת תוכנה",
+    "תוכנה",
+    "פיתוח תוכנה",
+    "אוטומציה",
+    "סייבר",
+    "אבטחת מידע",
+    "בדיקות תוכנה",
+    "וריפיקציה",
+    "ולידציה",
+    "אלגוריתמים",
+    "קושחה",
 ]
 
 
@@ -221,4 +246,13 @@ ISRAEL_LOCATIONS = [
     "kiryat gat",
     "modiin",
     "modi'in",
+    "ashdod",
+    "yehud",
+    "yehud monosson",
+    "beer yaakov",
+    "airport city",
+    "ramla",
+    "kiryat shmona",
+    "yokneam ilit",
+    "yoqneam illit",
 ]
