@@ -11,11 +11,6 @@ from bs4 import BeautifulSoup
 # Many Comeet customers also expose the same jobs on a server-rendered
 # branded careers page. We collect those branded pages here.
 COMEET_BRANDED_SITES = {
-    "Samsung R&D Israel": {
-        "url": "https://samsung-careers.co.il/careers/",
-        "job_pattern": r"/careers/co/.+?/[^/]+/all/?$",
-        "title_slug_index": -2,
-    },
     "Nuvoton Israel": {
         "url": "https://nuvoton.co.il/careers/",
         "job_pattern": r"/careers/co/.+?/[^/]+/all/?$",
