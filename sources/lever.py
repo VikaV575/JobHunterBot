@@ -34,6 +34,10 @@ LEVER_COMPANIES = {
         "site": "lendbuzz",
         "region": "global",
     },
+    "BioCatch": {
+        "site": "biocatch",
+        "region": "global",
+    },
 }
 
 
