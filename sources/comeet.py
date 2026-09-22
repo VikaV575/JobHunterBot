@@ -56,7 +56,7 @@ COMEET_BRANDED_SITES = {
     },
     "Anecdotes": {
         "url": "https://www.anecdotes.ai/careers",
-        "job_pattern": r"(?:comeet\.com/jobs/|/careers/|/positions/).+",
+        "job_pattern": r"/job/[^/]+/?$",
         "use_heading_title": True,
     },
 }
