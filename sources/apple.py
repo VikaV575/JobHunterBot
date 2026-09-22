@@ -8,10 +8,9 @@ from bs4 import BeautifulSoup
 
 APPLE_SEARCH_URL = "https://jobs.apple.com/en-il/search"
 
-# Apple keeps some very old roles visible in search results. We only keep
-# recently posted roles so stale 2024/2025 listings do not dominate the feed.
-MAX_JOB_AGE_DAYS = 90
-MAX_PAGES = 8
+# Apple keeps stale roles around for a long time. For this bot, freshness is
+# more important than completeness, so undated/old roles are excluded.
+MAX_JOB_AGE_DAYS = 60
 
 ISRAEL_LOCATION_HINTS = [
     "Herzliya",
@@ -31,7 +30,32 @@ DATE_PATTERN = re.compile(
 )
 
 
-def _nearest_context(link):
+def _extract_posted_date(text):
+    match = DATE_PATTERN.search(text)
+
+    if not match:
+        return None
+
+    day, month, year = match.groups()
+
+    if month.lower() == "sept":
+        month = "Sep"
+
+    try:
+        return datetime.strptime(
+            f"{day} {month} {year}",
+            "%d %b %Y",
+        ).date()
+    except ValueError:
+        return None
+
+
+def _job_context(link):
+    """
+    Find the Apple result card that contains both the role details and
+    posting date. The previous implementation stopped too early at a
+    smaller parent that contained the role number but not the date.
+    """
     fallback = link.get_text(" ", strip=True)
 
     for parent in link.parents:
@@ -45,20 +69,28 @@ def _nearest_context(link):
 
         text = parent.get_text(" ", strip=True)
 
-        if 20 <= len(text) <= 3500:
+        if 20 <= len(text) <= 5000:
             fallback = text
 
-        if "role number" in text.lower():
+        if (
+            "role number" in text.lower()
+            and _extract_posted_date(text) is not None
+        ):
             return text
 
     return fallback
 
 
 def _extract_title(link):
-    for parent in [link, *list(link.parents)[:4]]:
+    for parent in [link, *list(link.parents)[:5]]:
+        if not hasattr(parent, "find"):
+            continue
+
         heading = parent.find(["h2", "h3", "h4"])
+
         if heading:
             title = heading.get_text(" ", strip=True)
+
             if title:
                 return title
 
@@ -84,44 +116,16 @@ def _extract_location(context):
     return "Israel"
 
 
-def _extract_posted_date(context):
-    match = DATE_PATTERN.search(context)
-
-    if not match:
-        return None
-
-    day, month, year = match.groups()
-
-    # Apple sometimes writes September as "Sept" rather than "Sep".
-    if month.lower() == "sept":
-        month = "Sep"
-
-    try:
-        return datetime.strptime(
-            f"{day} {month} {year}",
-            "%d %b %Y",
-        ).date()
-
-    except ValueError:
-        return None
-
-
-def _is_recent(posted_date):
-    if posted_date is None:
-        # If Apple changes the markup and we cannot find the date,
-        # keep the role rather than accidentally losing a new posting.
-        return True
+def _parse_page(html):
+    soup = BeautifulSoup(html, "html.parser")
+    jobs = {}
 
     cutoff = date.today() - timedelta(
         days=MAX_JOB_AGE_DAYS
     )
 
-    return posted_date >= cutoff
-
-
-def _parse_page(html):
-    soup = BeautifulSoup(html, "html.parser")
-    jobs = {}
+    skipped_old = 0
+    skipped_undated = 0
 
     for link in soup.find_all("a", href=True):
         href = link.get("href", "")
@@ -130,15 +134,25 @@ def _parse_page(html):
             continue
 
         url = urljoin("https://jobs.apple.com", href)
-        context = _nearest_context(link)
+
+        if url in jobs:
+            continue
+
+        context = _job_context(link)
         title = _extract_title(link)
+        posted_date = _extract_posted_date(context)
 
         if not title:
             continue
 
-        posted_date = _extract_posted_date(context)
+        # Important: do NOT keep undated Apple roles. That fallback was the
+        # reason stale 2024/2025 positions were still getting through.
+        if posted_date is None:
+            skipped_undated += 1
+            continue
 
-        if not _is_recent(posted_date):
+        if posted_date < cutoff:
+            skipped_old += 1
             continue
 
         jobs[url] = {
@@ -148,69 +162,54 @@ def _parse_page(html):
             "url": url,
             "description": context,
             "source": "Apple Careers",
-            "posted_date": (
-                posted_date.isoformat()
-                if posted_date
-                else ""
-            ),
+            "posted_date": posted_date.isoformat(),
         }
+
+    print(
+        "Apple freshness filter: "
+        f"{len(jobs)} kept, "
+        f"{skipped_old} old skipped, "
+        f"{skipped_undated} undated skipped"
+    )
 
     return list(jobs.values())
 
 
 async def get_apple_jobs():
-    jobs = []
-    seen_urls = set()
-
     headers = {
-        "User-Agent": "Mozilla/5.0 JobHunterBot/1.0",
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 Chrome/152 Safari/537.36"
+        ),
         "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "en-US,en;q=0.9",
     }
 
-    async with httpx.AsyncClient(
-        timeout=20.0,
-        headers=headers,
-        follow_redirects=True,
-    ) as client:
-        for page in range(1, MAX_PAGES + 1):
-            params = {
-                "location": "israel-ISR",
-                "page": page,
-            }
+    params = {
+        "location": "israel-ISR",
+    }
 
-            try:
-                response = await client.get(
-                    APPLE_SEARCH_URL,
-                    params=params,
-                )
-                response.raise_for_status()
+    try:
+        async with httpx.AsyncClient(
+            timeout=20.0,
+            headers=headers,
+            follow_redirects=True,
+        ) as client:
+            response = await client.get(
+                APPLE_SEARCH_URL,
+                params=params,
+            )
+            response.raise_for_status()
 
-            except httpx.HTTPError as error:
-                print(
-                    f"Failed getting Apple Careers page "
-                    f"{page}: {error}"
-                )
-                break
+    except httpx.HTTPError as error:
+        print(f"Failed getting Apple Careers: {error}")
+        return []
 
-            page_jobs = _parse_page(response.text)
-            new_jobs = [
-                job
-                for job in page_jobs
-                if job["url"] not in seen_urls
-            ]
-
-            if not new_jobs:
-                # Apple sorts this search by newest. Once a page contains
-                # no recent roles, later pages are normally older as well.
-                break
-
-            for job in new_jobs:
-                seen_urls.add(job["url"])
-                jobs.append(job)
+    jobs = _parse_page(response.text)
 
     print(
-        f"Apple Careers: keeping {len(jobs)} roles "
-        f"posted in the last {MAX_JOB_AGE_DAYS} days"
+        f"Apple Careers: {len(jobs)} fresh roles "
+        f"(last {MAX_JOB_AGE_DAYS} days)"
     )
 
     return jobs
