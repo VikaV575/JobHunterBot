@@ -45,32 +45,38 @@ SOURCES = [
     ("Pinpoint", get_pinpoint_jobs),
 ]
 
-SOURCE_TIMEOUT_SECONDS = 45
+SOURCE_TIMEOUT_SECONDS = 60
+SOURCE_CONCURRENCY = 6
 
 
-async def _collect_source(source_name, source_function):
-    try:
-        jobs = await asyncio.wait_for(
-            source_function(),
-            timeout=SOURCE_TIMEOUT_SECONDS,
-        )
+async def _collect_source(
+    semaphore,
+    source_name,
+    source_function,
+):
+    async with semaphore:
+        try:
+            jobs = await asyncio.wait_for(
+                source_function(),
+                timeout=SOURCE_TIMEOUT_SECONDS,
+            )
 
-        print(f"{source_name}: {len(jobs)}")
-        return jobs
+            print(f"{source_name}: {len(jobs)}")
+            return jobs
 
-    except asyncio.TimeoutError:
-        print(
-            f"{source_name}: timed out after "
-            f"{SOURCE_TIMEOUT_SECONDS}s, skipping it"
-        )
-        return []
+        except asyncio.TimeoutError:
+            print(
+                f"{source_name}: timed out after "
+                f"{SOURCE_TIMEOUT_SECONDS}s, skipping it"
+            )
+            return []
 
-    except Exception as error:
-        print(
-            f"{source_name} failed: "
-            f"{type(error).__name__}: {error}"
-        )
-        return []
+        except Exception as error:
+            print(
+                f"{source_name} failed: "
+                f"{type(error).__name__}: {error}"
+            )
+            return []
 
 
 def _deduplicate_jobs(jobs):
@@ -104,9 +110,17 @@ def _deduplicate_jobs(jobs):
 
 
 async def get_jobs():
+    # Do not start every ATS at once. Too much parallel DNS/network traffic
+    # caused intermittent macOS resolver errors such as Errno 8.
+    semaphore = asyncio.Semaphore(SOURCE_CONCURRENCY)
+
     source_results = await asyncio.gather(
         *(
-            _collect_source(source_name, source_function)
+            _collect_source(
+                semaphore,
+                source_name,
+                source_function,
+            )
             for source_name, source_function in SOURCES
         )
     )
