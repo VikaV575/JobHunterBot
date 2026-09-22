@@ -30,6 +30,10 @@ LEVER_COMPANIES = {
         "site": "mobileye",
         "region": "eu",
     },
+    "Lendbuzz": {
+        "site": "lendbuzz",
+        "region": "global",
+    },
 }
 
 
